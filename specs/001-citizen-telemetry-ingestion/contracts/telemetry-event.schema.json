@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specs.nowgo.ai/saude/telemetry-event/v1.json",
+  "title": "TelemetryEvent",
+  "description": "Canonical anonymized telemetry event published by the citizen telemetry ingestion pipeline. Consumed by features 002 (dashboard), 003 (AI workers) and 004 (assistant).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "source_slug",
+    "received_at",
+    "region_code",
+    "topic",
+    "sentiment",
+    "severity",
+    "confidence",
+    "text_anonymized",
+    "status",
+    "iso_37120",
+    "iso_37122"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Server-issued UUIDv7 identifier."
+    },
+    "source_slug": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9_]+$",
+      "description": "Stable slug of the originating Source (e.g. ouvidor_sus_df, grok_x_search)."
+    },
+    "external_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Identifier provided by the source, unique per source_slug."
+    },
+    "received_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "occurred_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "description": "Original event timestamp from the source, when available."
+    },
+    "region_code": {
+      "type": "string",
+      "pattern": "^[0-9]{7}$",
+      "description": "IBGE 7-digit municipality/region code (DF=5300108 by default)."
+    },
+    "unit_code": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Optional health unit code (CNES) for joins with dashboard.units."
+    },
+    "topic": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "Primary operational topic (acesso_consulta, falta_medicamento, infraestrutura, etc)."
+    },
+    "subtopic": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 64
+    },
+    "sentiment": {
+      "type": "integer",
+      "minimum": -2,
+      "maximum": 2
+    },
+    "severity": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 3,
+      "description": "0=info, 1=low, 2=medium, 3=critical."
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Classifier confidence; values < 0.6 force a severity downgrade and the low_confidence flag."
+    },
+    "text_anonymized": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Anonymized free-text body. MUST NOT contain detectable PII."
+    },
+    "pii_tokens": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "string",
+        "pattern": "^pii:(cpf|cns|name|email|phone|address):[A-Za-z0-9_-]+$"
+      }
+    },
+    "attributes": {
+      "type": "object",
+      "additionalProperties": true,
+      "default": {}
+    },
+    "iso_37120": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^15\\.[0-9]{1,2}$"
+      }
+    },
+    "iso_37122": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "classified",
+        "quarantined",
+        "reprocessing"
+      ]
+    }
+  }
+}

@@ -1,0 +1,250 @@
+openapi: 3.1.0
+info:
+  title: NowGo Saude - Citizen Telemetry Ingestion API (admin)
+  version: 0.1.0
+  description: |
+    Admin endpoints for the citizen telemetry ingestion pipeline (Feature 001).
+    Public consumption of the canonical TelemetryEvent is described in
+    telemetry-event.schema.json. All endpoints require an authenticated
+    operator with role admin or operator. Reidentification of PII is denied
+    here and exposed only via a separate, audited service.
+servers:
+  - url: http://localhost:8000
+    description: Local dev
+  - url: https://saude.nowgo.local/api/v1
+    description: On-prem
+security:
+  - bearerAuth: []
+tags:
+  - name: sources
+  - name: pipeline-runs
+  - name: events
+  - name: metrics
+paths:
+  /api/v1/sources:
+    get:
+      tags: [sources]
+      summary: List configured sources
+      parameters:
+        - in: query
+          name: enabled
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Source" }
+    post:
+      tags: [sources]
+      summary: Create a source
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SourceCreate" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Source" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /api/v1/sources/{slug}:
+    parameters:
+      - in: path
+        name: slug
+        required: true
+        schema: { type: string, pattern: "^[a-z0-9_]+$" }
+    get:
+      tags: [sources]
+      summary: Get a source by slug
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Source" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [sources]
+      summary: Update a source (enable/disable, retention, config)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SourceUpdate" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Source" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/pipeline-runs:
+    get:
+      tags: [pipeline-runs]
+      summary: List pipeline runs
+      parameters:
+        - in: query
+          name: source_slug
+          schema: { type: string }
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [running, succeeded, partial, failed]
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50, maximum: 500 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PipelineRun" }
+  /api/v1/events:reprocess:
+    post:
+      tags: [events]
+      summary: Reprocess one or more events through the pipeline
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [event_ids]
+              properties:
+                event_ids:
+                  type: array
+                  minItems: 1
+                  maxItems: 1000
+                  items: { type: string, format: uuid }
+                reason:
+                  type: string
+                  maxLength: 500
+      responses:
+        "202":
+          description: Reprocessing accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pipeline_run_id: { type: string, format: uuid }
+                  enqueued: { type: integer }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /api/v1/metrics:
+    get:
+      tags: [metrics]
+      summary: Operational metrics summary (events/min, p95 latency, DLQ depth)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MetricsSummary" }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Source:
+      type: object
+      required: [id, slug, kind, display_name, enabled, config, retention_policy]
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string, pattern: "^[a-z0-9_]+$" }
+        kind:
+          type: string
+          enum: [ouvidoria_oficial, social_publica, formulario_interno]
+        display_name: { type: string }
+        enabled: { type: boolean }
+        config: { type: object, additionalProperties: true }
+        retention_policy:
+          type: object
+          required: [event_days, pii_days, raw_days]
+          properties:
+            event_days: { type: integer, minimum: 1 }
+            pii_days: { type: integer, minimum: 0 }
+            raw_days: { type: integer, minimum: 0 }
+        iso_37120_default:
+          type: array
+          items: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    SourceCreate:
+      type: object
+      required: [slug, kind, display_name, config, retention_policy]
+      properties:
+        slug: { type: string, pattern: "^[a-z0-9_]+$" }
+        kind: { $ref: "#/components/schemas/Source/properties/kind" }
+        display_name: { type: string }
+        enabled: { type: boolean, default: true }
+        config: { type: object, additionalProperties: true }
+        retention_policy: { $ref: "#/components/schemas/Source/properties/retention_policy" }
+        iso_37120_default:
+          type: array
+          items: { type: string }
+    SourceUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        enabled: { type: boolean }
+        display_name: { type: string }
+        config: { type: object, additionalProperties: true }
+        retention_policy: { $ref: "#/components/schemas/Source/properties/retention_policy" }
+    PipelineRun:
+      type: object
+      required: [id, source_id, started_at, status]
+      properties:
+        id: { type: string, format: uuid }
+        source_id: { type: string, format: uuid }
+        started_at: { type: string, format: date-time }
+        finished_at: { type: string, format: date-time, nullable: true }
+        status:
+          type: string
+          enum: [running, succeeded, partial, failed]
+        events_collected: { type: integer }
+        events_quarantined: { type: integer }
+        error_summary: { type: string, nullable: true }
+        metrics: { type: object, additionalProperties: true }
+    MetricsSummary:
+      type: object
+      required: [events_per_minute, p95_latency_ms, dlq_depth, anonymization_failures_24h]
+      properties:
+        events_per_minute: { type: number }
+        p95_latency_ms: { type: number }
+        dlq_depth: { type: integer }
+        anonymization_failures_24h: { type: integer }
+        updated_at: { type: string, format: date-time }
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        details: { type: object, additionalProperties: true }
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Conflict:
+      description: Conflict (slug already exists)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }

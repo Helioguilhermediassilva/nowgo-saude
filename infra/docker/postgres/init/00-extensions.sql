@@ -1,0 +1,9 @@
+-- Initialize pgvector extension and base schemas for NowGo Saude
+CREATE EXTENSION IF NOT EXISTS vector;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE SCHEMA IF NOT EXISTS telemetry;
+CREATE SCHEMA IF NOT EXISTS dashboard;
+CREATE SCHEMA IF NOT EXISTS audit;
+CREATE SCHEMA IF NOT EXISTS rag;

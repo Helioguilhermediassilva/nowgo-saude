@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+
+# Poetry
+poetry.toml
+
+# Node
+node_modules/
+.next/
+out/
+build/
+dist/
+.cache/
+*.log
+.DS_Store
+
+# Test / coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+
+# OS
+Thumbs.db
+
+# Local docker volumes
+infra/docker/.volumes/
