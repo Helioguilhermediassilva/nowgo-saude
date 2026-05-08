@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +12,14 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SPECS_DIR = REPO_ROOT / "specs" / "001-citizen-telemetry-ingestion" / "contracts"
+
+# Configure a per-session sqlite database before any nowgo_saude module is
+# imported so the engine binds to the test DB rather than a developer file.
+_TEST_DB = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+_TEST_DB.close()
+os.environ.setdefault("NOWGO_DATABASE_URL", f"sqlite+pysqlite:///{_TEST_DB.name}")
+os.environ.setdefault("NOWGO_ADMIN_TOKEN", "test-admin-token")
+os.environ.setdefault("NOWGO_PII_TOKEN_SECRET", "test-secret")
 
 
 @pytest.fixture(scope="session")
@@ -57,3 +67,41 @@ def valid_telemetry_event() -> dict[str, Any]:
 def admin_auth_headers() -> dict[str, str]:
     """Bearer token accepted by the dev auth middleware."""
     return {"Authorization": "Bearer test-admin-token"}
+
+
+@pytest.fixture
+def client():
+    """FastAPI TestClient with a freshly-initialised SQLite database."""
+    from fastapi.testclient import TestClient
+    from sqlalchemy import text
+
+    from nowgo_saude import db
+    from nowgo_saude.main import create_app
+
+    db.Base.metadata.drop_all(bind=db.engine)
+    db.init_db()
+    app = create_app()
+    with TestClient(app) as tc:
+        yield tc
+    with db.engine.begin() as conn:
+        for table in ("audit_entries", "telemetry_events", "pipeline_runs", "sources"):
+            conn.execute(text(f"DELETE FROM {table}"))
+
+
+@pytest.fixture
+def db_session():
+    """Standalone session for unit tests touching the ORM directly."""
+    from sqlalchemy import text
+
+    from nowgo_saude import db
+
+    db.Base.metadata.drop_all(bind=db.engine)
+    db.init_db()
+    session = db.SessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
+        with db.engine.begin() as conn:
+            for table in ("audit_entries", "telemetry_events", "pipeline_runs", "sources"):
+                conn.execute(text(f"DELETE FROM {table}"))

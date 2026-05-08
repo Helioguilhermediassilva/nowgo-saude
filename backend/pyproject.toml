@@ -26,7 +26,8 @@ select = ["E", "F", "I", "B", "UP", "N", "S", "ASYNC", "RUF"]
 ignore = ["S101"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["S101", "S106"]
+"tests/**/*.py" = ["S101", "S106", "S608"]
+"src/nowgo_saude/api/**/*.py" = ["B008"]
 
 [tool.mypy]
 python_version = "3.11"

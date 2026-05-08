@@ -50,3 +50,5 @@ Thumbs.db
 infra/docker/.volumes/
 
 .vercel/
+.vercel
+.env*.local
