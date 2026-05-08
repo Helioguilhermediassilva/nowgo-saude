@@ -1,0 +1,94 @@
+name: backend-ci
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-ci.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-ci.yml"
+
+concurrency:
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: backend
+
+jobs:
+  test:
+    name: lint + pytest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        run: pipx install poetry==1.8.5
+
+      - name: Cache Poetry virtualenv
+        uses: actions/cache@v4
+        with:
+          path: backend/.venv
+          key: poetry-${{ runner.os }}-py3.12-${{ hashFiles('backend/poetry.lock') }}
+
+      - name: Configure Poetry
+        run: poetry config virtualenvs.in-project true
+
+      - name: Install dependencies
+        run: poetry install --no-interaction --no-ansi
+
+      - name: Ruff
+        run: poetry run ruff check src tests alembic
+
+      - name: Pytest
+        run: poetry run pytest -q
+
+      - name: Alembic upgrade dry-run (SQLite)
+        env:
+          NOWGO_DATABASE_URL: sqlite+pysqlite:///./ci.db
+        run: |
+          poetry run alembic upgrade head
+          poetry run alembic current
+
+  docker:
+    name: docker build
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          file: backend/Dockerfile
+          push: false
+          load: true
+          tags: nowgo-saude-backend:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test container
+        run: |
+          docker run -d --name nowgo \
+            -e NOWGO_DATABASE_URL=sqlite+pysqlite:////tmp/ci.db \
+            -p 8000:8000 \
+            nowgo-saude-backend:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/health >/dev/null; then
+              echo "healthy"; exit 0
+            fi
+            sleep 1
+          done
+          docker logs nowgo
+          exit 1
