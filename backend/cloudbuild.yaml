@@ -1,0 +1,89 @@
+# Cloud Build pipeline for the NowGo Saúde backend.
+#
+# Triggers expected:
+#   - Push to main on backend/** → build & deploy to Cloud Run.
+#
+# Required substitutions (set on the trigger or via --substitutions):
+#   _REGION          (default: southamerica-east1)  São Paulo, for LGPD residency.
+#   _SERVICE         (default: nowgo-saude-backend) Cloud Run service name.
+#   _AR_REPO         (default: nowgo-saude)         Artifact Registry repo.
+#   _SQL_INSTANCE    PROJECT:REGION:INSTANCE of the Cloud SQL Postgres.
+#
+# Required Cloud Run secrets (managed via Secret Manager, mounted as env):
+#   NOWGO_DATABASE_URL, NOWGO_ADMIN_TOKEN, NOWGO_LGPD_OFFICER_TOKEN,
+#   NOWGO_PII_TOKEN_SECRET, NOWGO_PII_VAULT_KEY, NOWGO_PII_VAULT_KEY_VERSION
+
+substitutions:
+  _REGION: southamerica-east1
+  _SERVICE: nowgo-saude-backend
+  _AR_REPO: nowgo-saude
+  _SQL_INSTANCE: ""
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+steps:
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    dir: backend
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/backend:$COMMIT_SHA
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/backend:latest
+      - .
+
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/backend
+
+  # Run migrations as a one-shot Cloud Run Job so concurrent service instances
+  # never race on alembic_version.
+  - id: migrate
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -eu
+        gcloud run jobs deploy ${_SERVICE}-migrate \
+          --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/backend:$COMMIT_SHA \
+          --region=${_REGION} \
+          --command=alembic \
+          --args=upgrade,head \
+          --set-cloudsql-instances=${_SQL_INSTANCE} \
+          --set-secrets=NOWGO_DATABASE_URL=NOWGO_DATABASE_URL:latest,NOWGO_PII_TOKEN_SECRET=NOWGO_PII_TOKEN_SECRET:latest,NOWGO_PII_VAULT_KEY=NOWGO_PII_VAULT_KEY:latest \
+          --max-retries=1 \
+          --quiet
+        gcloud run jobs execute ${_SERVICE}-migrate --region=${_REGION} --wait --quiet
+
+  - id: deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -eu
+        gcloud run deploy ${_SERVICE} \
+          --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/backend:$COMMIT_SHA \
+          --region=${_REGION} \
+          --platform=managed \
+          --port=8000 \
+          --allow-unauthenticated \
+          --add-cloudsql-instances=${_SQL_INSTANCE} \
+          --set-env-vars=NOWGO_ENVIRONMENT=production \
+          --set-secrets=NOWGO_DATABASE_URL=NOWGO_DATABASE_URL:latest,NOWGO_ADMIN_TOKEN=NOWGO_ADMIN_TOKEN:latest,NOWGO_LGPD_OFFICER_TOKEN=NOWGO_LGPD_OFFICER_TOKEN:latest,NOWGO_PII_TOKEN_SECRET=NOWGO_PII_TOKEN_SECRET:latest,NOWGO_PII_VAULT_KEY=NOWGO_PII_VAULT_KEY:latest,NOWGO_PII_VAULT_KEY_VERSION=NOWGO_PII_VAULT_KEY_VERSION:latest \
+          --min-instances=0 \
+          --max-instances=4 \
+          --memory=512Mi \
+          --cpu=1 \
+          --timeout=60 \
+          --quiet
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/backend:$COMMIT_SHA
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/backend:latest

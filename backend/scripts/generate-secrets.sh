@@ -5,8 +5,14 @@ set -eu
 
 py() { python3 -c "$1"; }
 
-echo "# Copy these into Railway / Fly / Cloud Run / Vercel as appropriate."
+echo "# NowGo Saúde production secrets."
 echo "# DO NOT commit this output."
+echo "# Pipe into GCP Secret Manager, e.g.:"
+echo "#   ./scripts/generate-secrets.sh | while IFS='=' read -r k v; do"
+echo "#     [ -z \"\$k\" ] || [[ \"\$k\" == \\#* ]] && continue"
+echo "#     printf '%s' \"\$v\" | gcloud secrets create \"\$k\" --data-file=- \\"
+echo "#       || printf '%s' \"\$v\" | gcloud secrets versions add \"\$k\" --data-file=-"
+echo "#   done"
 echo
 echo "NOWGO_ADMIN_TOKEN=$(py 'import secrets; print(secrets.token_urlsafe(48))')"
 echo "NOWGO_LGPD_OFFICER_TOKEN=$(py 'import secrets; print(secrets.token_urlsafe(48))')"
