@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from .api import events, metrics, pipeline_runs, sources
+from .api import events, metrics, pii, pipeline_runs, sources
 from .config import get_settings
 from .db import init_db
 
@@ -36,6 +36,7 @@ def create_app() -> FastAPI:
     app.include_router(pipeline_runs.router)
     app.include_router(events.router)
     app.include_router(metrics.router)
+    app.include_router(pii.router)
     return app
 
 

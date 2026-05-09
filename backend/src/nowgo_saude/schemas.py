@@ -136,6 +136,20 @@ class TelemetryEventOut(BaseModel):
     status: EventStatus
 
 
+class PiiReidentifyRequest(BaseModel):
+    reason: str = Field(min_length=3, max_length=500)
+
+
+class PiiReidentifyResponse(BaseModel):
+    token: str
+    category: Literal["cpf", "cns", "name", "email", "phone", "address"]
+    value: str
+    key_version: int
+    first_seen_at: datetime
+    last_seen_at: datetime
+    usage_count: int
+
+
 class ErrorResponse(BaseModel):
     code: str
     message: str

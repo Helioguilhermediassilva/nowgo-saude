@@ -23,7 +23,13 @@ class Settings(BaseSettings):
     environment: str = Field(default="dev")
     database_url: str = Field(default="sqlite+pysqlite:///./nowgo_saude.db")
     admin_token: str = Field(default="test-admin-token")
+    lgpd_officer_token: str = Field(default="test-lgpd-officer-token")
     pii_token_secret: str = Field(default="dev-pii-secret-change-me")
+    pii_vault_key: str = Field(
+        default="ZGV2LXBpaS12YXVsdC1rZXktY2hhbmdlLW1lLTAwMDA=",
+        description="Base64-encoded 32-byte AES-256-GCM key (current generation).",
+    )
+    pii_vault_key_version: int = Field(default=1, ge=1)
     classifier_low_confidence_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
 
 

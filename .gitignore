@@ -49,6 +49,12 @@ Thumbs.db
 # Local docker volumes
 infra/docker/.volumes/
 
+# Local dev SQLite databases
+*.sqlite
+*.sqlite3
+backend/*.db
+backend/nowgo_saude.db
+
 .vercel/
 .vercel
 .env*.local

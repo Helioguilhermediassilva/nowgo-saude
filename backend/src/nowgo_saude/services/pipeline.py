@@ -18,11 +18,23 @@ from ..models.source import Source
 from ..models.telemetry_event import TelemetryEvent
 from ..schemas import EventIngestRequest
 from . import audit as audit_service
-from .anonymization import anonymize, contains_residual_pii
+from . import pii_vault as pii_vault_service
+from .anonymization import AnonymizationResult, anonymize, contains_residual_pii
 
 
 class IngestionError(Exception):
     """Raised when an ingest payload references an unknown or disabled source."""
+
+
+def _persist_findings(session: Session, result: AnonymizationResult) -> None:
+    """Mirror PII findings into the encrypted vault for later re-identification."""
+    for finding in result.findings:
+        pii_vault_service.store(
+            session,
+            token=finding.token,
+            category=finding.category,
+            value=finding.value,
+        )
 
 
 def _apply_low_confidence_rule(
@@ -59,6 +71,8 @@ def ingest_event(
     status = "classified"
     if result.failed or contains_residual_pii(result.text_anonymized):
         status = "quarantined"
+    else:
+        _persist_findings(session, result)
 
     event = TelemetryEvent(
         source_id=source.id,
@@ -124,6 +138,7 @@ def reprocess_events(
             event.status = "reprocessing"
             event.text_anonymized = result.text_anonymized
             event.pii_tokens = result.pii_tokens
+            _persist_findings(session, result)
         enqueued += 1
         audit_service.record(
             session,

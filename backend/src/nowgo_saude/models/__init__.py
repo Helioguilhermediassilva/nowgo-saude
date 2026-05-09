@@ -9,8 +9,15 @@ configured via Alembic in a follow-up).
 from __future__ import annotations
 
 from .audit_entry import AuditEntry
+from .pii_vault import PIIVaultRecord
 from .pipeline_run import PipelineRun
 from .source import Source
 from .telemetry_event import TelemetryEvent
 
-__all__ = ["AuditEntry", "PipelineRun", "Source", "TelemetryEvent"]
+__all__ = [
+    "AuditEntry",
+    "PIIVaultRecord",
+    "PipelineRun",
+    "Source",
+    "TelemetryEvent",
+]

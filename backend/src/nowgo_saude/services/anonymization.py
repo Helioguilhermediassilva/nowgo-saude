@@ -39,10 +39,20 @@ _RECOGNIZERS: tuple[_Recognizer, ...] = (
 )
 
 
+@dataclass(frozen=True)
+class PiiFinding:
+    """A single PII match: original value and the deterministic vault token."""
+
+    category: PiiCategory
+    value: str
+    token: str
+
+
 @dataclass
 class AnonymizationResult:
     text_anonymized: str
     pii_tokens: list[str] = field(default_factory=list)
+    findings: list[PiiFinding] = field(default_factory=list)
     failed: bool = False
     failure_reason: str | None = None
 
@@ -60,6 +70,7 @@ def anonymize(text: str) -> AnonymizationResult:
 
     redacted = text
     tokens: list[str] = []
+    findings: list[PiiFinding] = []
     seen: set[str] = set()
     for rec in _RECOGNIZERS:
         for match in rec.pattern.finditer(text):
@@ -68,8 +79,11 @@ def anonymize(text: str) -> AnonymizationResult:
             if token not in seen:
                 seen.add(token)
                 tokens.append(token)
+                findings.append(PiiFinding(category=rec.category, value=value, token=token))
             redacted = redacted.replace(value, f"[{rec.category.upper()}]")
-    return AnonymizationResult(text_anonymized=redacted, pii_tokens=tokens)
+    return AnonymizationResult(
+        text_anonymized=redacted, pii_tokens=tokens, findings=findings
+    )
 
 
 def contains_residual_pii(text: str) -> bool:

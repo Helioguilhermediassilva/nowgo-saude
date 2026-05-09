@@ -19,7 +19,11 @@ _TEST_DB = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
 _TEST_DB.close()
 os.environ.setdefault("NOWGO_DATABASE_URL", f"sqlite+pysqlite:///{_TEST_DB.name}")
 os.environ.setdefault("NOWGO_ADMIN_TOKEN", "test-admin-token")
+os.environ.setdefault("NOWGO_LGPD_OFFICER_TOKEN", "test-lgpd-officer-token")
 os.environ.setdefault("NOWGO_PII_TOKEN_SECRET", "test-secret")
+os.environ.setdefault(
+    "NOWGO_PII_VAULT_KEY", "ZGV2LXBpaS12YXVsdC1rZXktY2hhbmdlLW1lLTAwMDA="
+)
 
 
 @pytest.fixture(scope="session")
@@ -84,7 +88,13 @@ def client():
     with TestClient(app) as tc:
         yield tc
     with db.engine.begin() as conn:
-        for table in ("audit_entries", "telemetry_events", "pipeline_runs", "sources"):
+        for table in (
+            "audit_entries",
+            "telemetry_events",
+            "pipeline_runs",
+            "pii_vault_records",
+            "sources",
+        ):
             conn.execute(text(f"DELETE FROM {table}"))
 
 
@@ -103,5 +113,11 @@ def db_session():
     finally:
         session.close()
         with db.engine.begin() as conn:
-            for table in ("audit_entries", "telemetry_events", "pipeline_runs", "sources"):
+            for table in (
+                "audit_entries",
+                "telemetry_events",
+                "pipeline_runs",
+                "pii_vault_records",
+                "sources",
+            ):
                 conn.execute(text(f"DELETE FROM {table}"))
