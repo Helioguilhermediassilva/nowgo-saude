@@ -45,6 +45,8 @@ WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 COPY alembic.ini ./alembic.ini
 COPY alembic ./alembic
+COPY scripts/start.sh /usr/local/bin/start.sh
+RUN chmod +x /usr/local/bin/start.sh
 
 USER app
 
@@ -53,4 +55,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD curl -fsS "http://127.0.0.1:${PORT}/health" || exit 1
 
-CMD ["sh", "-c", "uvicorn nowgo_saude.main:app --host 0.0.0.0 --port ${PORT}"]
+CMD ["/usr/local/bin/start.sh"]

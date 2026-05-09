@@ -9,13 +9,13 @@ from sqlalchemy import engine_from_config, pool
 
 from nowgo_saude import models  # noqa: F401  (import side-effect: register models)
 from nowgo_saude.config import get_settings
-from nowgo_saude.db import Base
+from nowgo_saude.db import Base, normalize_db_url
 
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
+config.set_main_option("sqlalchemy.url", normalize_db_url(get_settings().database_url))
 
 target_metadata = Base.metadata
 
