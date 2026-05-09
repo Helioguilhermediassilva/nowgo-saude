@@ -31,7 +31,11 @@ jobs:
           python-version: "3.12"
 
       - name: Install Poetry
-        run: pipx install poetry==1.8.5
+        uses: snok/install-poetry@v1
+        with:
+          version: 1.8.5
+          virtualenvs-create: true
+          virtualenvs-in-project: true
 
       - name: Cache Poetry virtualenv
         uses: actions/cache@v4
@@ -39,11 +43,8 @@ jobs:
           path: backend/.venv
           key: poetry-${{ runner.os }}-py3.12-${{ hashFiles('backend/poetry.lock') }}
 
-      - name: Configure Poetry
-        run: poetry config virtualenvs.in-project true
-
       - name: Install dependencies
-        run: poetry install --no-interaction --no-ansi
+        run: poetry install --no-interaction --no-ansi -vv
 
       - name: Ruff
         run: poetry run ruff check src tests alembic

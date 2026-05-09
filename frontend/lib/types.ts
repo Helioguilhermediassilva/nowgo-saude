@@ -75,3 +75,17 @@ export interface PipelineHealth {
   lastSuccessfulIngestionAt: string;
   message?: string;
 }
+
+// Raw shapes returned by the FastAPI backend (Feature 001).
+export interface PipelineHealthBackend {
+  status: string;
+  environment: string;
+}
+
+export interface MetricsSummary {
+  events_per_minute: number;
+  p95_latency_ms: number;
+  dlq_depth: number;
+  anonymization_failures_24h: number;
+  updated_at: string;
+}

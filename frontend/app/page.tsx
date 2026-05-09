@@ -19,14 +19,14 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default function Home() {
+export default async function Home() {
   const kpis = getKpis();
   const heatmap = getHeatmap();
   const attention = getAttentionUnits();
   const timeseries = getTimeSeries(24);
   const topics = getTopics();
   const alerts = getAlerts();
-  const health = getPipelineHealth();
+  const health = await getPipelineHealth();
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
