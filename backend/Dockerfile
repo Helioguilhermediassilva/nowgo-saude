@@ -45,8 +45,8 @@ WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 COPY alembic.ini ./alembic.ini
 COPY alembic ./alembic
-COPY scripts/start.sh /usr/local/bin/start.sh
-RUN chmod +x /usr/local/bin/start.sh
+COPY scripts ./scripts
+RUN cp scripts/start.sh /usr/local/bin/start.sh && chmod +x /usr/local/bin/start.sh
 
 USER app
 

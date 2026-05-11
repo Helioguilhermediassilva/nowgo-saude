@@ -6,7 +6,21 @@
 
 import "server-only";
 
-import type { MetricsSummary, PipelineHealthBackend } from "./types";
+import type {
+  AlertEvent,
+  AttentionUnit,
+  KPI,
+  MetricsSummary,
+  PipelineHealth,
+  PipelineHealthBackend,
+  RegionPressure,
+  TimeSeriesPoint,
+  TopicSlice,
+} from "./types";
+
+interface ItemsEnvelope<T> {
+  items: T[];
+}
 
 type FetchOpts = {
   path: string;
@@ -49,6 +63,72 @@ export async function getBackendHealth(): Promise<PipelineHealthBackend | null> 
 
 export async function getBackendMetrics(): Promise<MetricsSummary | null> {
   return backendFetch<MetricsSummary>({ path: "/api/v1/metrics", auth: true, revalidate: 30 });
+}
+
+// Feature 002 — Command Center Dashboard aggregations.
+// All endpoints require the admin bearer; payloads use camelCase keys
+// matching the frontend types in `./types`.
+
+export async function getBackendDashboardHealth(): Promise<PipelineHealth | null> {
+  return backendFetch<PipelineHealth>({
+    path: "/api/v1/dashboard/health",
+    auth: true,
+    revalidate: 15,
+  });
+}
+
+export async function getBackendDashboardKpis(): Promise<KPI[] | null> {
+  const env = await backendFetch<ItemsEnvelope<KPI>>({
+    path: "/api/v1/dashboard/kpis",
+    auth: true,
+    revalidate: 30,
+  });
+  return env?.items ?? null;
+}
+
+export async function getBackendDashboardHeatmap(): Promise<RegionPressure[] | null> {
+  const env = await backendFetch<ItemsEnvelope<RegionPressure>>({
+    path: "/api/v1/dashboard/heatmap",
+    auth: true,
+    revalidate: 30,
+  });
+  return env?.items ?? null;
+}
+
+export async function getBackendDashboardAttention(limit = 12): Promise<AttentionUnit[] | null> {
+  const env = await backendFetch<ItemsEnvelope<AttentionUnit>>({
+    path: `/api/v1/dashboard/units/attention?limit=${limit}`,
+    auth: true,
+    revalidate: 30,
+  });
+  return env?.items ?? null;
+}
+
+export async function getBackendDashboardTopics(): Promise<TopicSlice[] | null> {
+  const env = await backendFetch<ItemsEnvelope<TopicSlice>>({
+    path: "/api/v1/dashboard/topics",
+    auth: true,
+    revalidate: 60,
+  });
+  return env?.items ?? null;
+}
+
+export async function getBackendDashboardTimeseries(hours = 24): Promise<TimeSeriesPoint[] | null> {
+  const env = await backendFetch<ItemsEnvelope<TimeSeriesPoint>>({
+    path: `/api/v1/dashboard/timeseries?hours=${hours}`,
+    auth: true,
+    revalidate: 30,
+  });
+  return env?.items ?? null;
+}
+
+export async function getBackendDashboardAlerts(limit = 12): Promise<AlertEvent[] | null> {
+  const env = await backendFetch<ItemsEnvelope<AlertEvent>>({
+    path: `/api/v1/dashboard/alerts?limit=${limit}`,
+    auth: true,
+    revalidate: 15,
+  });
+  return env?.items ?? null;
 }
 
 export function isBackendConfigured(): boolean {

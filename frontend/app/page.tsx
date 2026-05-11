@@ -20,13 +20,15 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const kpis = getKpis();
-  const heatmap = getHeatmap();
-  const attention = getAttentionUnits();
-  const timeseries = getTimeSeries(24);
-  const topics = getTopics();
-  const alerts = getAlerts();
-  const health = await getPipelineHealth();
+  const [kpis, heatmap, attention, timeseries, topics, alerts, health] = await Promise.all([
+    getKpis(),
+    getHeatmap(),
+    getAttentionUnits(),
+    getTimeSeries(24),
+    getTopics(),
+    getAlerts(),
+    getPipelineHealth(),
+  ]);
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
