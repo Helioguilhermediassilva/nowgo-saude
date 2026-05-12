@@ -8,6 +8,8 @@ import "server-only";
 
 import type {
   AlertEvent,
+  AlertEventPage,
+  AlertFilters,
   AttentionUnit,
   KPI,
   MetricsSummary,
@@ -141,12 +143,28 @@ export async function getBackendDashboardTimeseries(hours = 24): Promise<TimeSer
 }
 
 export async function getBackendDashboardAlerts(limit = 12): Promise<AlertEvent[] | null> {
-  const env = await backendFetch<ItemsEnvelope<AlertEvent>>({
-    path: `/api/v1/dashboard/alerts?limit=${limit}`,
+  const page = await getBackendDashboardAlertsPage({ limit });
+  return page?.items ?? null;
+}
+
+// Feature 002 §G2.4 — paginated + filterable alert listing for the
+// dedicated /alerts page. Multi-valued filters (severity/status) are
+// emitted as repeated query params, matching FastAPI's `list[str]` parsing.
+export async function getBackendDashboardAlertsPage(
+  filters: AlertFilters = {},
+): Promise<AlertEventPage | null> {
+  const params = new URLSearchParams();
+  params.set("limit", String(filters.limit ?? 12));
+  params.set("offset", String(filters.offset ?? 0));
+  for (const s of filters.severity ?? []) params.append("severity", s);
+  for (const s of filters.status ?? []) params.append("status", s);
+  if (filters.raId) params.set("raId", filters.raId);
+  if (filters.topic) params.set("topic", filters.topic);
+  return backendFetch<AlertEventPage>({
+    path: `/api/v1/dashboard/alerts?${params.toString()}`,
     auth: true,
     revalidate: 15,
   });
-  return env?.items ?? null;
 }
 
 export function isBackendConfigured(): boolean {

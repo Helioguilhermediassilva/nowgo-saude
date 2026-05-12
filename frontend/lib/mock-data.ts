@@ -3,6 +3,9 @@
 
 import type {
   AlertEvent,
+  AlertEventPage,
+  AlertFilters,
+  AlertSeverityCounts,
   AttentionUnit,
   KPI,
   PipelineHealth,
@@ -180,6 +183,8 @@ export function getAlerts(): AlertEvent[] {
       scope: "RA Ceilândia",
       message: "Reclamações de fila acima do limiar de 30/h por 2 janelas seguidas",
       status: "open",
+      raId: "RA-IX",
+      topic: "fila",
     },
     {
       id: "a-002",
@@ -189,6 +194,8 @@ export function getAlerts(): AlertEvent[] {
       scope: "UBS 3 Sol Nascente",
       message: "Crescimento atípico (+58%) em queixas sobre medicamento em falta",
       status: "open",
+      raId: "RA-XXIX",
+      topic: "medicamento",
     },
     {
       id: "a-003",
@@ -198,8 +205,35 @@ export function getAlerts(): AlertEvent[] {
       scope: "RA Samambaia",
       message: "Score de pressão acima de 70 por 3 janelas consecutivas",
       status: "acknowledged",
+      raId: "RA-XII",
+      topic: "atendimento",
     },
   ];
+}
+
+// Feature 002 §G2.4 — paginable mock list used as fallback when the
+// backend is unreachable. Mirrors the server contract (items + total +
+// severity counts) so the UI can be exercised end-to-end offline.
+export function getAlertsPage(filters: AlertFilters = {}): AlertEventPage {
+  const base = getAlerts();
+  const filtered = base.filter((a) => {
+    if (filters.severity?.length && !filters.severity.includes(a.severity)) return false;
+    if (filters.status?.length && !filters.status.includes(a.status)) return false;
+    if (filters.raId && a.raId !== filters.raId) return false;
+    if (filters.topic && a.topic !== filters.topic) return false;
+    return true;
+  });
+  const limit = filters.limit ?? 12;
+  const offset = filters.offset ?? 0;
+  const counts: AlertSeverityCounts = { critical: 0, high: 0, medium: 0, low: 0 };
+  for (const a of filtered) counts[a.severity] += 1;
+  return {
+    items: filtered.slice(offset, offset + limit),
+    total: filtered.length,
+    limit,
+    offset,
+    severityCounts: counts,
+  };
 }
 
 export function getPipelineHealth(): PipelineHealth {

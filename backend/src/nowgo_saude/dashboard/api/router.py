@@ -28,7 +28,7 @@ from ..services.aggregations import (
     topic_breakdown,
     unit_detail,
 )
-from ..services.alerts import derive_alerts
+from ..services.alerts import list_alerts
 from ..services.health import pipeline_health
 from ..services.kpis import compute_kpis
 from ..services.units import attention_units
@@ -148,8 +148,21 @@ def timeseries(
     response_model_by_alias=True,
 )
 def alerts(
-    limit: int = Query(default=12, ge=1, le=50),
+    limit: int = Query(default=12, ge=1, le=100),
+    offset: int = Query(default=0, ge=0, le=10_000),
+    severity: list[str] | None = Query(default=None),
+    status: list[str] | None = Query(default=None),
+    ra_id: str | None = Query(default=None, alias="raId"),
+    topic: str | None = Query(default=None),
     session: Session = Depends(db_session),
     _: str = Depends(require_admin),
 ) -> AlertEventList:
-    return AlertEventList(items=derive_alerts(session, limit=limit))
+    return list_alerts(
+        session,
+        severities=severity,
+        statuses=status,
+        ra_id=ra_id,
+        topic=topic,
+        limit=limit,
+        offset=offset,
+    )

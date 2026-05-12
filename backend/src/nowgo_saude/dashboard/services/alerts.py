@@ -4,30 +4,40 @@ The MVP synthesises alerts from anomaly signals captured on heatmap +
 attention-units services. A real Feature 003 worker will eventually persist
 these into a dedicated ``alerts`` table; until then this gives the operator
 useful, traceable items in production.
+
+G2.4 introduces server-side filtering (severity/status/raId/topic) and
+pagination so the dedicated `/alerts` page can render large windows
+without overwhelming the UI.
 """
 
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
-from ..schemas import AlertEventOut
+from ..schemas import AlertEventList, AlertEventOut, AlertSeverityCounts
 from .aggregations import heatmap_by_ra
 from .units import attention_units
 
 
 def _alert_id(prefix: str, key: str) -> str:
-    digest = hashlib.sha1(f"{prefix}:{key}".encode("utf-8"), usedforsecurity=False).hexdigest()
+    digest = hashlib.sha1(f"{prefix}:{key}".encode(), usedforsecurity=False).hexdigest()
     return f"alert-{prefix}-{digest[:10]}"
 
 
-def derive_alerts(session: Session, *, limit: int = 12) -> list[AlertEventOut]:
+def _derive_all(session: Session) -> list[AlertEventOut]:
+    """Synthesize the full alert universe before filters/pagination.
+
+    The internal attention-units sample size is capped so the in-memory
+    pipeline stays bounded even if the DB grows.
+    """
     now = datetime.now(UTC)
     out: list[AlertEventOut] = []
 
-    for unit in attention_units(session, limit=limit):
+    for unit in attention_units(session, limit=50):
         if unit.attention_score < 75:
             continue
         out.append(
@@ -39,6 +49,8 @@ def derive_alerts(session: Session, *, limit: int = 12) -> list[AlertEventOut]:
                 scope=unit.name,
                 message=unit.reason,
                 status="open",
+                ra_id=None,
+                topic=None,
             )
         )
 
@@ -62,8 +74,76 @@ def derive_alerts(session: Session, *, limit: int = 12) -> list[AlertEventOut]:
                     f"(top: {region.top_topic})"
                 ),
                 status="open" if region.pressure_score >= 80 else "acknowledged",
+                ra_id=region.ra_id,
+                topic=region.top_topic,
             )
         )
 
     out.sort(key=lambda a: a.triggered_at, reverse=True)
-    return out[:limit]
+    return out
+
+
+def _matches(
+    alert: AlertEventOut,
+    *,
+    severities: set[str] | None,
+    statuses: set[str] | None,
+    ra_id: str | None,
+    topic: str | None,
+) -> bool:
+    if severities is not None and alert.severity not in severities:
+        return False
+    if statuses is not None and alert.status not in statuses:
+        return False
+    if ra_id is not None and alert.ra_id != ra_id:
+        return False
+    if topic is not None and alert.topic != topic:
+        return False
+    return True
+
+
+def _counts(alerts: Iterable[AlertEventOut]) -> AlertSeverityCounts:
+    counts = AlertSeverityCounts()
+    for a in alerts:
+        if a.severity == "critical":
+            counts.critical += 1
+        elif a.severity == "high":
+            counts.high += 1
+        elif a.severity == "medium":
+            counts.medium += 1
+        elif a.severity == "low":
+            counts.low += 1
+    return counts
+
+
+def list_alerts(
+    session: Session,
+    *,
+    severities: list[str] | None = None,
+    statuses: list[str] | None = None,
+    ra_id: str | None = None,
+    topic: str | None = None,
+    limit: int = 12,
+    offset: int = 0,
+) -> AlertEventList:
+    all_alerts = _derive_all(session)
+    sev_set = set(severities) if severities else None
+    st_set = set(statuses) if statuses else None
+
+    filtered = [
+        a for a in all_alerts
+        if _matches(a, severities=sev_set, statuses=st_set, ra_id=ra_id, topic=topic)
+    ]
+    page = filtered[offset : offset + limit]
+    return AlertEventList(
+        items=page,
+        total=len(filtered),
+        limit=limit,
+        offset=offset,
+        severity_counts=_counts(filtered),
+    )
+
+
+def derive_alerts(session: Session, *, limit: int = 12) -> list[AlertEventOut]:
+    """Backwards-compatible helper for dashboards that only need the top N."""
+    return list_alerts(session, limit=limit).items

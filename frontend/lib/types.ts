@@ -58,6 +58,8 @@ export interface TopicSlice {
   pct: number;
 }
 
+export type AlertStatus = "open" | "acknowledged" | "resolved";
+
 export interface AlertEvent {
   id: string;
   ruleName: string;
@@ -65,7 +67,34 @@ export interface AlertEvent {
   triggeredAt: string;
   scope: string; // e.g. "RA Ceilândia"
   message: string;
-  status: "open" | "acknowledged" | "resolved";
+  status: AlertStatus;
+  raId?: string | null;
+  topic?: OperationalTopic | null;
+}
+
+export interface AlertSeverityCounts {
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+}
+
+// Server-side filterable + paginated alert listing (Feature 002 §G2.4).
+export interface AlertEventPage {
+  items: AlertEvent[];
+  total: number;
+  limit: number;
+  offset: number;
+  severityCounts: AlertSeverityCounts;
+}
+
+export interface AlertFilters {
+  severity?: Severity[];
+  status?: AlertStatus[];
+  raId?: string;
+  topic?: OperationalTopic;
+  limit?: number;
+  offset?: number;
 }
 
 export interface PipelineHealth {

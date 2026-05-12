@@ -77,6 +77,15 @@ class AlertEventOut(_CamelModel):
     scope: str
     message: str
     status: AlertStatus
+    ra_id: str | None = Field(default=None, serialization_alias="raId")
+    topic: OperationalTopic | None = None
+
+
+class AlertSeverityCounts(_CamelModel):
+    critical: int = 0
+    high: int = 0
+    medium: int = 0
+    low: int = 0
 
 
 class PipelineHealthOut(_CamelModel):
@@ -115,6 +124,12 @@ class TopicSliceList(_ItemsEnvelope):
 
 class AlertEventList(_ItemsEnvelope):
     items: list[AlertEventOut]
+    total: int = 0
+    limit: int = 0
+    offset: int = 0
+    severity_counts: AlertSeverityCounts = Field(
+        default_factory=AlertSeverityCounts, serialization_alias="severityCounts"
+    )
 
 
 class RegionDetailOut(_CamelModel):

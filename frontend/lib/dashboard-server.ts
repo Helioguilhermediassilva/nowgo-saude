@@ -9,6 +9,7 @@ import "server-only";
 
 import {
   getBackendDashboardAlerts,
+  getBackendDashboardAlertsPage,
   getBackendDashboardAttention,
   getBackendDashboardHealth,
   getBackendDashboardHeatmap,
@@ -23,6 +24,7 @@ import {
 } from "./backend-client";
 import {
   getAlerts as mockGetAlerts,
+  getAlertsPage as mockGetAlertsPage,
   getAttentionUnits as mockGetAttentionUnits,
   getHeatmap as mockGetHeatmap,
   getKpis as mockGetKpis,
@@ -34,6 +36,8 @@ import {
 } from "./mock-data";
 import type {
   AlertEvent,
+  AlertEventPage,
+  AlertFilters,
   AttentionUnit,
   KPI,
   PipelineHealth,
@@ -97,6 +101,15 @@ export async function getAlerts(): Promise<AlertEvent[]> {
   // Alerts can legitimately be empty (no anomalies) — only fall back when the
   // backend call itself failed (returned null), not on empty arrays.
   return live ?? mockGetAlerts();
+}
+
+// Feature 002 §G2.4 — paginated + filterable alert listing. Used by the
+// dedicated `/alerts` page; falls back to a mock page when the backend
+// is offline so previews stay populated.
+export async function getAlertsPage(filters: AlertFilters = {}): Promise<AlertEventPage> {
+  if (!isBackendConfigured()) return mockGetAlertsPage(filters);
+  const live = await getBackendDashboardAlertsPage(filters);
+  return live ?? mockGetAlertsPage(filters);
 }
 
 export async function getPipelineHealth(): Promise<PipelineHealth> {
