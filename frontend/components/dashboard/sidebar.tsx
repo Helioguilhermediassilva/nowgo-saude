@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   Activity,
   AlertTriangle,
@@ -10,16 +13,25 @@ import {
 } from "lucide-react";
 
 const NAV = [
-  { href: "/", label: "Painel", icon: Home, active: true },
-  { href: "#", label: "Mapa operacional", icon: Map },
-  { href: "#", label: "Unidades", icon: Building2 },
-  { href: "#", label: "Alertas", icon: AlertTriangle },
-  { href: "#", label: "Tópicos", icon: MessagesSquare },
-  { href: "#", label: "Pipelines", icon: Activity },
-  { href: "#", label: "KPIs Smart City", icon: Gauge },
-];
+  { href: "/", label: "Painel", icon: Home },
+  { href: "/ra", label: "Regiões administrativas", icon: Map },
+  { href: "/units", label: "Unidades", icon: Building2 },
+  { href: "/alerts", label: "Alertas", icon: AlertTriangle },
+  { href: "/topics", label: "Tópicos", icon: MessagesSquare },
+  { href: "/pipelines", label: "Pipelines", icon: Activity },
+  { href: "/kpis", label: "KPIs Smart City", icon: Gauge },
+] as const;
+
+// Routes match the current pathname when they are an exact match, or when the
+// current pathname starts with `${href}/` so detail pages keep the section
+// active (e.g. /ra/RA-I highlights "Regiões administrativas").
+function isActive(href: string, pathname: string): boolean {
+  if (href === "/") return pathname === "/";
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export function Sidebar() {
+  const pathname = usePathname() ?? "/";
   return (
     <aside className="hidden w-60 shrink-0 border-r border-border bg-card lg:flex lg:flex-col">
       <div className="flex h-14 items-center gap-2 border-b border-border px-4">
@@ -36,11 +48,13 @@ export function Sidebar() {
       <nav className="flex flex-1 flex-col gap-0.5 p-2">
         {NAV.map((item) => {
           const Icon = item.icon;
+          const active = isActive(item.href, pathname);
           return (
             <Link
-              key={item.label}
+              key={item.href}
               href={item.href}
-              data-active={item.active ? "" : undefined}
+              aria-current={active ? "page" : undefined}
+              data-active={active ? "" : undefined}
               className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground data-[active]:bg-muted data-[active]:text-foreground"
             >
               <Icon className="size-4" />
