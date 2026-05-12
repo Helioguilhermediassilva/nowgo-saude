@@ -1,13 +1,24 @@
 // Server-side data accessors used by the dashboard during SSR.
-// When BACKEND_API_URL is configured, getPipelineHealth bridges to the real
-// FastAPI backend (Feature 001) — using /health and /api/v1/metrics — and
-// falls back to the mock layer on any failure or when the env is missing.
-// All other accessors keep their mock implementation until the backend
-// exposes the corresponding aggregations.
+// When BACKEND_API_URL is configured, every accessor bridges to the FastAPI
+// dashboard endpoints (Feature 002) and falls back to the mock layer if the
+// backend is unreachable, unauthenticated, or returns no data. This keeps
+// previews and offline development functional while production renders the
+// real Postgres-backed aggregations.
 
 import "server-only";
 
-import { getBackendHealth, getBackendMetrics, isBackendConfigured } from "./backend-client";
+import {
+  getBackendDashboardAlerts,
+  getBackendDashboardAttention,
+  getBackendDashboardHealth,
+  getBackendDashboardHeatmap,
+  getBackendDashboardKpis,
+  getBackendDashboardTimeseries,
+  getBackendDashboardTopics,
+  getBackendHealth,
+  getBackendMetrics,
+  isBackendConfigured,
+} from "./backend-client";
 import {
   getAlerts as mockGetAlerts,
   getAttentionUnits as mockGetAttentionUnits,
@@ -17,22 +28,67 @@ import {
   getTimeSeries as mockGetTimeSeries,
   getTopics as mockGetTopics,
 } from "./mock-data";
-import type { PipelineHealth } from "./types";
-
-export const getKpis = mockGetKpis;
-export const getAttentionUnits = mockGetAttentionUnits;
-export const getHeatmap = mockGetHeatmap;
-export const getAlerts = mockGetAlerts;
-export const getTimeSeries = mockGetTimeSeries;
-export const getTopics = mockGetTopics;
+import type {
+  AlertEvent,
+  AttentionUnit,
+  KPI,
+  PipelineHealth,
+  RegionPressure,
+  TimeSeriesPoint,
+  TopicSlice,
+} from "./types";
 
 const LATENCY_THRESHOLD_SECONDS = 300;
+
+export async function getKpis(): Promise<KPI[]> {
+  if (!isBackendConfigured()) return mockGetKpis();
+  const live = await getBackendDashboardKpis();
+  return live && live.length > 0 ? live : mockGetKpis();
+}
+
+export async function getHeatmap(): Promise<RegionPressure[]> {
+  if (!isBackendConfigured()) return mockGetHeatmap();
+  const live = await getBackendDashboardHeatmap();
+  return live && live.length > 0 ? live : mockGetHeatmap();
+}
+
+export async function getAttentionUnits(): Promise<AttentionUnit[]> {
+  if (!isBackendConfigured()) return mockGetAttentionUnits();
+  const live = await getBackendDashboardAttention();
+  return live && live.length > 0 ? live : mockGetAttentionUnits();
+}
+
+export async function getTopics(): Promise<TopicSlice[]> {
+  if (!isBackendConfigured()) return mockGetTopics();
+  const live = await getBackendDashboardTopics();
+  return live && live.length > 0 ? live : mockGetTopics();
+}
+
+export async function getTimeSeries(hours = 24): Promise<TimeSeriesPoint[]> {
+  if (!isBackendConfigured()) return mockGetTimeSeries(hours);
+  const live = await getBackendDashboardTimeseries(hours);
+  return live && live.length > 0 ? live : mockGetTimeSeries(hours);
+}
+
+export async function getAlerts(): Promise<AlertEvent[]> {
+  if (!isBackendConfigured()) return mockGetAlerts();
+  const live = await getBackendDashboardAlerts();
+  // Alerts can legitimately be empty (no anomalies) — only fall back when the
+  // backend call itself failed (returned null), not on empty arrays.
+  return live ?? mockGetAlerts();
+}
 
 export async function getPipelineHealth(): Promise<PipelineHealth> {
   if (!isBackendConfigured()) {
     return mockGetPipelineHealth();
   }
 
+  // Prefer the dashboard health endpoint (Feature 002) which includes p95
+  // latency and last successful ingestion in a single payload.
+  const dashHealth = await getBackendDashboardHealth();
+  if (dashHealth) return dashHealth;
+
+  // Fallback: derive a synthetic health snapshot from /health + /metrics.
   const [health, metrics] = await Promise.all([getBackendHealth(), getBackendMetrics()]);
   if (!health) {
     return mockGetPipelineHealth();
