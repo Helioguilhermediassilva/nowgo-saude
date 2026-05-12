@@ -38,7 +38,9 @@ def _severity(score: int) -> str:
     return "low"
 
 
-def attention_units(session: Session, *, limit: int = 12) -> list[AttentionUnitOut]:
+def attention_units(
+    session: Session, *, limit: int = 12, ra_id: str | None = None
+) -> list[AttentionUnitOut]:
     now = datetime.now(UTC)
     last_24h = now - timedelta(hours=24)
     baseline_start = now - timedelta(days=15)
@@ -63,9 +65,11 @@ def attention_units(session: Session, *, limit: int = 12) -> list[AttentionUnitO
         lambda: {"recent": [], "baseline": [], "name": None, "ra": None}
     )
     for unit_code, received_raw, topic, severity, sentiment, attrs in rows:
+        attrs_dict = attrs if isinstance(attrs, dict) else {}
+        if ra_id is not None and attrs_dict.get("ra_id") != ra_id:
+            continue
         received = _as_utc(received_raw)
         bucket = by_unit[unit_code]
-        attrs_dict = attrs if isinstance(attrs, dict) else {}
         if not bucket["name"]:
             bucket["name"] = attrs_dict.get("unit_name") or f"Unidade {unit_code}"
             bucket["ra"] = attrs_dict.get("ra_name") or "Distrito Federal"

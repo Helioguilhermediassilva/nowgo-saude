@@ -115,3 +115,19 @@ class TopicSliceList(_ItemsEnvelope):
 
 class AlertEventList(_ItemsEnvelope):
     items: list[AlertEventOut]
+
+
+class RegionDetailOut(_CamelModel):
+    """Aggregated drill-down for a single Região Administrativa."""
+
+    ra_id: str = Field(serialization_alias="raId")
+    ra_name: str = Field(serialization_alias="raName")
+    population: int
+    pressure_score: int = Field(serialization_alias="pressureScore")
+    event_count_24h: int = Field(serialization_alias="eventCount24h")
+    event_count_prev_24h: int = Field(serialization_alias="eventCountPrev24h")
+    top_topic: OperationalTopic = Field(serialization_alias="topTopic")
+    trend: Trend
+    topics: list[TopicSliceOut]
+    timeseries: list[TimeSeriesPointOut]
+    units: list[AttentionUnitOut]

@@ -76,6 +76,22 @@ export interface PipelineHealth {
   message?: string;
 }
 
+// Region drill-down (Feature 002 §G2.2): joins heatmap, topic mix,
+// hourly series, and the attention units inside a single RA.
+export interface RegionDetail {
+  raId: string;
+  raName: string;
+  population: number;
+  pressureScore: number;
+  eventCount24h: number;
+  eventCountPrev24h: number;
+  topTopic: OperationalTopic;
+  trend: "up" | "down" | "stable";
+  topics: TopicSlice[];
+  timeseries: TimeSeriesPoint[];
+  units: AttentionUnit[];
+}
+
 // Raw shapes returned by the FastAPI backend (Feature 001).
 export interface PipelineHealthBackend {
   status: string;

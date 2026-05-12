@@ -20,8 +20,14 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from ...models.telemetry_event import TelemetryEvent
-from ..schemas import RegionPressureOut, TimeSeriesPointOut, TopicSliceOut
-from .regions import DF_REGIONS
+from ..schemas import (
+    AttentionUnitOut,
+    RegionDetailOut,
+    RegionPressureOut,
+    TimeSeriesPointOut,
+    TopicSliceOut,
+)
+from .regions import DF_REGIONS, REGION_BY_ID
 
 KNOWN_TOPICS: tuple[str, ...] = (
     "fila", "infraestrutura", "atendimento", "medicamento", "agendamento", "outros"
@@ -143,3 +149,85 @@ def time_series(session: Session, hours: int) -> list[TimeSeriesPointOut]:
         ts = now - timedelta(hours=i)
         out.append(TimeSeriesPointOut(ts=ts, value=buckets.get(ts, 0)))
     return out
+
+
+def region_detail(session: Session, ra_id: str) -> RegionDetailOut | None:
+    """Drill-down aggregation scoped to a single Região Administrativa.
+
+    Mirrors the heatmap math (24h window vs prior 24h) plus topic mix,
+    hourly time series, and the units within the RA exhibiting attention
+    signals. Returns ``None`` when ``ra_id`` does not exist in DF_REGIONS.
+    """
+    from .units import attention_units  # local import avoids cycles
+
+    ra = REGION_BY_ID.get(ra_id)
+    if ra is None:
+        return None
+
+    now = datetime.now(UTC).replace(minute=0, second=0, microsecond=0)
+    last_24h = now - timedelta(hours=24)
+    prior_24h = now - timedelta(hours=48)
+    events = _load_events(session, prior_24h)
+    ra_events = [
+        ev for ev in events
+        if isinstance(ev.attributes, dict) and ev.attributes.get("ra_id") == ra_id
+    ]
+    recent = [e for e in ra_events if e.received_at >= last_24h]
+    prior = [e for e in ra_events if e.received_at < last_24h]
+
+    topic_counts: dict[str, int] = defaultdict(int)
+    sev_sum = 0
+    neg_count = 0
+    for ev in recent:
+        topic_counts[_normalize_topic(ev.topic)] += 1
+        sev_sum += max(ev.severity, 0)
+        if ev.sentiment <= -1:
+            neg_count += 1
+    top_topic = (
+        max(topic_counts.items(), key=lambda kv: kv[1])[0] if topic_counts else "outros"
+    )
+    total_recent = sum(topic_counts.values()) or 1
+    topics = [
+        TopicSliceOut(
+            topic=t,  # type: ignore[arg-type]
+            count=topic_counts.get(t, 0),
+            pct=round(topic_counts.get(t, 0) / total_recent * 1000) / 10,
+        )
+        for t in KNOWN_TOPICS
+    ]
+    topics.sort(key=lambda s: s.count, reverse=True)
+
+    density = len(recent) / max(ra.population, 1) * 100_000
+    score_raw = density * 0.6 + (sev_sum / max(len(recent), 1)) * 18 + (
+        neg_count / max(len(recent), 1)
+    ) * 25
+    pressure = max(0, min(100, int(round(score_raw))))
+    delta = len(recent) - len(prior)
+    trend = "up" if delta > max(3, len(prior) * 0.15) else (
+        "down" if delta < -max(3, len(prior) * 0.15) else "stable"
+    )
+
+    buckets: dict[datetime, int] = defaultdict(int)
+    for ev in recent:
+        b = ev.received_at.astimezone(UTC).replace(minute=0, second=0, microsecond=0)
+        buckets[b] += 1
+    series: list[TimeSeriesPointOut] = []
+    for i in range(24, -1, -1):
+        ts = now - timedelta(hours=i)
+        series.append(TimeSeriesPointOut(ts=ts, value=buckets.get(ts, 0)))
+
+    units: list[AttentionUnitOut] = attention_units(session, limit=10, ra_id=ra_id)
+
+    return RegionDetailOut(
+        ra_id=ra.ra_id,
+        ra_name=ra.name,
+        population=ra.population,
+        pressure_score=pressure,
+        event_count_24h=len(recent),
+        event_count_prev_24h=len(prior),
+        top_topic=top_topic,  # type: ignore[arg-type]
+        trend=trend,  # type: ignore[arg-type]
+        topics=topics,
+        timeseries=series,
+        units=units,
+    )

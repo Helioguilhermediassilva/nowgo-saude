@@ -13,6 +13,7 @@ import {
   getBackendDashboardHealth,
   getBackendDashboardHeatmap,
   getBackendDashboardKpis,
+  getBackendDashboardRegion,
   getBackendDashboardTimeseries,
   getBackendDashboardTopics,
   getBackendHealth,
@@ -25,6 +26,7 @@ import {
   getHeatmap as mockGetHeatmap,
   getKpis as mockGetKpis,
   getPipelineHealth as mockGetPipelineHealth,
+  getRegionDetail as mockGetRegionDetail,
   getTimeSeries as mockGetTimeSeries,
   getTopics as mockGetTopics,
 } from "./mock-data";
@@ -33,6 +35,7 @@ import type {
   AttentionUnit,
   KPI,
   PipelineHealth,
+  RegionDetail,
   RegionPressure,
   TimeSeriesPoint,
   TopicSlice,
@@ -50,6 +53,13 @@ export async function getHeatmap(): Promise<RegionPressure[]> {
   if (!isBackendConfigured()) return mockGetHeatmap();
   const live = await getBackendDashboardHeatmap();
   return live && live.length > 0 ? live : mockGetHeatmap();
+}
+
+export async function getRegionDetail(raId: string): Promise<RegionDetail | null> {
+  if (!isBackendConfigured()) return mockGetRegionDetail(raId);
+  const live = await getBackendDashboardRegion(raId);
+  // Empty 24h windows are legitimate, so only fall back on transport failure.
+  return live ?? mockGetRegionDetail(raId);
 }
 
 export async function getAttentionUnits(): Promise<AttentionUnit[]> {

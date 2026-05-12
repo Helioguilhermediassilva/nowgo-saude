@@ -13,6 +13,7 @@ import type {
   MetricsSummary,
   PipelineHealth,
   PipelineHealthBackend,
+  RegionDetail,
   RegionPressure,
   TimeSeriesPoint,
   TopicSlice,
@@ -93,6 +94,14 @@ export async function getBackendDashboardHeatmap(): Promise<RegionPressure[] | n
     revalidate: 30,
   });
   return env?.items ?? null;
+}
+
+export async function getBackendDashboardRegion(raId: string): Promise<RegionDetail | null> {
+  return backendFetch<RegionDetail>({
+    path: `/api/v1/dashboard/regions/${encodeURIComponent(raId)}`,
+    auth: true,
+    revalidate: 30,
+  });
 }
 
 export async function getBackendDashboardAttention(limit = 12): Promise<AttentionUnit[] | null> {

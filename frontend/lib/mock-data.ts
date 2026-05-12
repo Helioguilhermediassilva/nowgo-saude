@@ -6,6 +6,7 @@ import type {
   AttentionUnit,
   KPI,
   PipelineHealth,
+  RegionDetail,
   RegionPressure,
   TimeSeriesPoint,
   TopicSlice,
@@ -205,5 +206,35 @@ export function getPipelineHealth(): PipelineHealth {
     latencyP95Seconds: 47,
     thresholdSeconds: 300,
     lastSuccessfulIngestionAt: new Date(Date.now() - 12_000).toISOString(),
+  };
+}
+
+// Derived region drill-down used as fallback when the backend cannot be
+// reached. Picks the heatmap row matching `raId` and seeds the drill-down
+// from the existing topics/timeseries/attention mocks.
+export function getRegionDetail(raId: string): RegionDetail | null {
+  const ra = RAS.find((r) => r.id === raId);
+  if (!ra) return null;
+  const pressure = getHeatmap().find((r) => r.raId === raId);
+  const allTopics = getTopics();
+  const total24h = Math.round(60 + rng() * 240);
+  // Scale the global topic mix to the RA scope.
+  const topics: TopicSlice[] = allTopics.map((t) => {
+    const count = Math.max(1, Math.round((t.pct / 100) * total24h));
+    return { topic: t.topic, count, pct: t.pct };
+  });
+  const units = getAttentionUnits().filter((u) => u.raName === ra.name);
+  return {
+    raId: ra.id,
+    raName: ra.name,
+    population: 100_000 + Math.round(rng() * 400_000),
+    pressureScore: pressure?.pressureScore ?? Math.round(20 + rng() * 75),
+    eventCount24h: total24h,
+    eventCountPrev24h: Math.round(total24h * (0.6 + rng() * 0.6)),
+    topTopic: pressure?.topTopic ?? "fila",
+    trend: pressure?.trend ?? "stable",
+    topics,
+    timeseries: getTimeSeries(24),
+    units,
   };
 }

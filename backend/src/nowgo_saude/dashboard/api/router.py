@@ -6,7 +6,7 @@ dashboard. All responses use camelCase JSON to match the frontend types.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ...api.deps import db_session, require_admin
@@ -15,11 +15,17 @@ from ..schemas import (
     AttentionUnitList,
     KPIList,
     PipelineHealthOut,
+    RegionDetailOut,
     RegionPressureList,
     TimeSeriesList,
     TopicSliceList,
 )
-from ..services.aggregations import heatmap_by_ra, time_series, topic_breakdown
+from ..services.aggregations import (
+    heatmap_by_ra,
+    region_detail,
+    time_series,
+    topic_breakdown,
+)
 from ..services.alerts import derive_alerts
 from ..services.health import pipeline_health
 from ..services.kpis import compute_kpis
@@ -62,6 +68,22 @@ def heatmap(
     _: str = Depends(require_admin),
 ) -> RegionPressureList:
     return RegionPressureList(items=heatmap_by_ra(session))
+
+
+@router.get(
+    "/regions/{ra_id}",
+    response_model=RegionDetailOut,
+    response_model_by_alias=True,
+)
+def region(
+    ra_id: str,
+    session: Session = Depends(db_session),
+    _: str = Depends(require_admin),
+) -> RegionDetailOut:
+    detail = region_detail(session, ra_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail=f"Região {ra_id} not found")
+    return detail
 
 
 @router.get(
