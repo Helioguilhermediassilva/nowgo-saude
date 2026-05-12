@@ -131,3 +131,34 @@ class RegionDetailOut(_CamelModel):
     topics: list[TopicSliceOut]
     timeseries: list[TimeSeriesPointOut]
     units: list[AttentionUnitOut]
+
+
+class RecentEventOut(_CamelModel):
+    """Anonymized event row exposed in the unit drill-down feed."""
+
+    id: str
+    received_at: datetime = Field(serialization_alias="receivedAt")
+    topic: OperationalTopic
+    severity: int
+    sentiment: int
+    text: str
+
+
+class UnitDetailOut(_CamelModel):
+    """Aggregated drill-down for a single health unit (UPA/UBS/Hospital)."""
+
+    unit_id: str = Field(serialization_alias="unitId")
+    name: str
+    ra_id: str = Field(serialization_alias="raId")
+    ra_name: str = Field(serialization_alias="raName")
+    attention_score: int = Field(serialization_alias="attentionScore")
+    severity: Severity
+    event_count_24h: int = Field(serialization_alias="eventCount24h")
+    event_count_prev_24h: int = Field(serialization_alias="eventCountPrev24h")
+    event_count_7d: int = Field(serialization_alias="eventCount7d")
+    growth_pct: float = Field(serialization_alias="growthPct")
+    top_topic: OperationalTopic = Field(serialization_alias="topTopic")
+    trend: Trend
+    topics: list[TopicSliceOut]
+    timeseries: list[TimeSeriesPointOut]
+    recent_events: list[RecentEventOut] = Field(serialization_alias="recentEvents")

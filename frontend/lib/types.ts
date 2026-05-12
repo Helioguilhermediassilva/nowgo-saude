@@ -92,6 +92,36 @@ export interface RegionDetail {
   units: AttentionUnit[];
 }
 
+// Anonymized event row exposed in the unit drill-down feed.
+export interface RecentEvent {
+  id: string;
+  receivedAt: string; // ISO 8601
+  topic: OperationalTopic;
+  severity: number; // 0..3
+  sentiment: number; // -2..2
+  text: string;
+}
+
+// Unit drill-down (Feature 002 §G2.3): profile + 24h/prev/7d KPIs,
+// 7-day daily timeseries, topic mix, and recent anonymized events.
+export interface UnitDetail {
+  unitId: string;
+  name: string;
+  raId: string;
+  raName: string;
+  attentionScore: number;
+  severity: Severity;
+  eventCount24h: number;
+  eventCountPrev24h: number;
+  eventCount7d: number;
+  growthPct: number;
+  topTopic: OperationalTopic;
+  trend: "up" | "down" | "stable";
+  topics: TopicSlice[];
+  timeseries: TimeSeriesPoint[];
+  recentEvents: RecentEvent[];
+}
+
 // Raw shapes returned by the FastAPI backend (Feature 001).
 export interface PipelineHealthBackend {
   status: string;

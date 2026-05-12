@@ -11,21 +11,37 @@ import {
 } from "recharts";
 import type { TimeSeriesPoint } from "@/lib/types";
 
-export function TimeSeriesChart({ items }: { items: TimeSeriesPoint[] }) {
+interface TimeSeriesChartProps {
+  items: TimeSeriesPoint[];
+  mode?: "hour" | "day";
+  title?: string;
+  description?: string;
+}
+
+export function TimeSeriesChart({
+  items,
+  mode = "hour",
+  title = "Eventos por hora · 24h",
+  description = "Volume agregado de menções e queixas operacionais",
+}: TimeSeriesChartProps) {
   const data = items.map((p) => ({
-    label: new Date(p.ts).toLocaleTimeString("pt-BR", {
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
+    label:
+      mode === "day"
+        ? new Date(p.ts).toLocaleDateString("pt-BR", {
+            day: "2-digit",
+            month: "2-digit",
+          })
+        : new Date(p.ts).toLocaleTimeString("pt-BR", {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
     value: p.value,
   }));
   return (
     <section className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4">
       <header>
-        <h2 className="text-sm font-semibold">Eventos por hora · 24h</h2>
-        <p className="text-[11px] text-muted-foreground">
-          Volume agregado de menções e queixas operacionais
-        </p>
+        <h2 className="text-sm font-semibold">{title}</h2>
+        <p className="text-[11px] text-muted-foreground">{description}</p>
       </header>
       <div className="h-56 w-full">
         <ResponsiveContainer width="100%" height="100%">

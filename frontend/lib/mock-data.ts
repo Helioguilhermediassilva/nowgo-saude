@@ -6,10 +6,12 @@ import type {
   AttentionUnit,
   KPI,
   PipelineHealth,
+  RecentEvent,
   RegionDetail,
   RegionPressure,
   TimeSeriesPoint,
   TopicSlice,
+  UnitDetail,
 } from "./types";
 
 const RAS = [
@@ -206,6 +208,72 @@ export function getPipelineHealth(): PipelineHealth {
     latencyP95Seconds: 47,
     thresholdSeconds: 300,
     lastSuccessfulIngestionAt: new Date(Date.now() - 12_000).toISOString(),
+  };
+}
+
+// Derived unit drill-down used as fallback when the backend cannot be
+// reached. Picks the attention-unit row matching `unitId` and synthesizes
+// a 7-day daily series plus a small feed of anonymized events.
+const MOCK_RECENT_PHRASES: Record<string, string> = {
+  fila: "Fila longa para atendimento, sem informação sobre tempo de espera.",
+  atendimento: "Atendimento demorado, equipe parecia sobrecarregada.",
+  medicamento: "Medicamento em falta na unidade, precisei buscar em outra.",
+  agendamento: "Não conseguiu agendar consulta, sistema indisponível.",
+  infraestrutura: "Ar-condicionado não funciona, banheiro com problema.",
+  outros: "Comentário sobre o serviço prestado na unidade.",
+};
+
+export function getUnitDetail(unitId: string): UnitDetail | null {
+  const unit = getAttentionUnits().find((u) => u.unitId === unitId);
+  if (!unit) return null;
+  const ra = RAS.find((r) => r.name === unit.raName);
+  const allTopics = getTopics();
+  const total24h = unit.eventCount24h;
+  const topics: TopicSlice[] = allTopics.map((t) => {
+    const count = Math.max(1, Math.round((t.pct / 100) * total24h));
+    return { topic: t.topic, count, pct: t.pct };
+  });
+  // Daily 7d series anchored at midnight UTC.
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  const timeseries: TimeSeriesPoint[] = [];
+  let total7d = 0;
+  for (let i = 6; i >= 0; i--) {
+    const value = Math.max(1, Math.round(total24h * (0.6 + rng() * 0.8)));
+    total7d += value;
+    timeseries.push({
+      ts: new Date(today.getTime() - i * 86_400_000).toISOString(),
+      value,
+    });
+  }
+  const recentEvents: RecentEvent[] = Array.from({ length: 6 }).map((_, idx) => {
+    const topic = (allTopics[idx % allTopics.length]?.topic ?? "outros") as TopicSlice["topic"];
+    return {
+      id: `mock-${unitId}-${idx}`,
+      receivedAt: new Date(Date.now() - (idx + 1) * 15 * 60_000).toISOString(),
+      topic,
+      severity: 1 + Math.floor(rng() * 3),
+      sentiment: -1 - Math.floor(rng() * 2),
+      text: MOCK_RECENT_PHRASES[topic] ?? MOCK_RECENT_PHRASES.outros,
+    } as RecentEvent;
+  });
+  const prev24h = Math.max(1, Math.round(total24h / (1 + unit.growthPct / 100)));
+  return {
+    unitId: unit.unitId,
+    name: unit.name,
+    raId: ra?.id ?? "",
+    raName: unit.raName,
+    attentionScore: unit.attentionScore,
+    severity: unit.severity,
+    eventCount24h: total24h,
+    eventCountPrev24h: prev24h,
+    eventCount7d: total7d,
+    growthPct: unit.growthPct,
+    topTopic: topics[0]?.topic ?? "outros",
+    trend: unit.growthPct > 10 ? "up" : unit.growthPct < -10 ? "down" : "stable",
+    topics,
+    timeseries,
+    recentEvents,
   };
 }
 

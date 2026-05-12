@@ -16,6 +16,7 @@ import {
   getBackendDashboardRegion,
   getBackendDashboardTimeseries,
   getBackendDashboardTopics,
+  getBackendDashboardUnit,
   getBackendHealth,
   getBackendMetrics,
   isBackendConfigured,
@@ -29,6 +30,7 @@ import {
   getRegionDetail as mockGetRegionDetail,
   getTimeSeries as mockGetTimeSeries,
   getTopics as mockGetTopics,
+  getUnitDetail as mockGetUnitDetail,
 } from "./mock-data";
 import type {
   AlertEvent,
@@ -39,6 +41,7 @@ import type {
   RegionPressure,
   TimeSeriesPoint,
   TopicSlice,
+  UnitDetail,
 } from "./types";
 
 const LATENCY_THRESHOLD_SECONDS = 300;
@@ -66,6 +69,14 @@ export async function getAttentionUnits(): Promise<AttentionUnit[]> {
   if (!isBackendConfigured()) return mockGetAttentionUnits();
   const live = await getBackendDashboardAttention();
   return live && live.length > 0 ? live : mockGetAttentionUnits();
+}
+
+export async function getUnitDetail(unitId: string): Promise<UnitDetail | null> {
+  if (!isBackendConfigured()) return mockGetUnitDetail(unitId);
+  const live = await getBackendDashboardUnit(unitId);
+  // 404 from the backend (returned as `null` by backendFetch) is propagated
+  // by trying the mock fallback — keeps preview/offline parity with prod.
+  return live ?? mockGetUnitDetail(unitId);
 }
 
 export async function getTopics(): Promise<TopicSlice[]> {

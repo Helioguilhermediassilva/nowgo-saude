@@ -19,12 +19,14 @@ from ..schemas import (
     RegionPressureList,
     TimeSeriesList,
     TopicSliceList,
+    UnitDetailOut,
 )
 from ..services.aggregations import (
     heatmap_by_ra,
     region_detail,
     time_series,
     topic_breakdown,
+    unit_detail,
 )
 from ..services.alerts import derive_alerts
 from ..services.health import pipeline_health
@@ -97,6 +99,22 @@ def attention(
     _: str = Depends(require_admin),
 ) -> AttentionUnitList:
     return AttentionUnitList(items=attention_units(session, limit=limit))
+
+
+@router.get(
+    "/units/{unit_id}",
+    response_model=UnitDetailOut,
+    response_model_by_alias=True,
+)
+def unit(
+    unit_id: str,
+    session: Session = Depends(db_session),
+    _: str = Depends(require_admin),
+) -> UnitDetailOut:
+    detail = unit_detail(session, unit_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail=f"Unidade {unit_id} not found")
+    return detail
 
 
 @router.get(

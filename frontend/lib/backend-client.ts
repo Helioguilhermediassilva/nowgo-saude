@@ -17,6 +17,7 @@ import type {
   RegionPressure,
   TimeSeriesPoint,
   TopicSlice,
+  UnitDetail,
 } from "./types";
 
 interface ItemsEnvelope<T> {
@@ -111,6 +112,14 @@ export async function getBackendDashboardAttention(limit = 12): Promise<Attentio
     revalidate: 30,
   });
   return env?.items ?? null;
+}
+
+export async function getBackendDashboardUnit(unitId: string): Promise<UnitDetail | null> {
+  return backendFetch<UnitDetail>({
+    path: `/api/v1/dashboard/units/${encodeURIComponent(unitId)}`,
+    auth: true,
+    revalidate: 30,
+  });
 }
 
 export async function getBackendDashboardTopics(): Promise<TopicSlice[] | null> {
