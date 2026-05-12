@@ -95,13 +95,13 @@ def attention_units(
         raw = density * 0.6 + (sev_sum / max(len(recent), 1)) * 14 + min(growth_pct, 120) * 0.25 + (
             neg / max(len(recent), 1)
         ) * 18
-        score = max(0, min(100, int(round(raw))))
+        score = max(0, min(100, round(raw)))
         topic_counts: dict[str, int] = defaultdict(int)
         for _, t, _, _ in recent:
             topic_counts[t] += 1
         top_topic = max(topic_counts.items(), key=lambda kv: kv[1])[0]
         reason_template = _REASON_TEMPLATES.get(top_topic, _REASON_TEMPLATES["outros"])
-        reason = reason_template.format(growth=int(round(growth_pct)))
+        reason = reason_template.format(growth=round(growth_pct))
         out.append(
             AttentionUnitOut(
                 unit_id=unit_code,

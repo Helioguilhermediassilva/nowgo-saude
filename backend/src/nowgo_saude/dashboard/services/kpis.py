@@ -137,7 +137,7 @@ def _wait_p95(rows: list) -> float:
     if not waits:
         return 0.0
     waits.sort()
-    idx = max(0, min(len(waits) - 1, int(round(0.95 * (len(waits) - 1)))))
+    idx = max(0, min(len(waits) - 1, round(0.95 * (len(waits) - 1))))
     return float(waits[idx])
 
 

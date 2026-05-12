@@ -28,6 +28,7 @@ ignore = ["S101"]
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101", "S106", "S608"]
 "src/nowgo_saude/api/**/*.py" = ["B008"]
+"src/nowgo_saude/dashboard/api/**/*.py" = ["B008"]
 "alembic/versions/*.py" = ["E501", "I001", "F401", "UP"]
 
 [tool.mypy]

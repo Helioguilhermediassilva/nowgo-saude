@@ -102,7 +102,7 @@ def heatmap_by_ra(session: Session) -> list[RegionPressureOut]:
         score_raw = density * 0.6 + (sev_sum / max(len(recent), 1)) * 18 + (
             neg_count / max(len(recent), 1)
         ) * 25
-        pressure = max(0, min(100, int(round(score_raw))))
+        pressure = max(0, min(100, round(score_raw)))
         delta = len(recent) - len(prior)
         trend = "up" if delta > max(3, len(prior) * 0.15) else (
             "down" if delta < -max(3, len(prior) * 0.15) else "stable"
@@ -203,7 +203,7 @@ def region_detail(session: Session, ra_id: str) -> RegionDetailOut | None:
     score_raw = density * 0.6 + (sev_sum / max(len(recent), 1)) * 18 + (
         neg_count / max(len(recent), 1)
     ) * 25
-    pressure = max(0, min(100, int(round(score_raw))))
+    pressure = max(0, min(100, round(score_raw)))
     delta = len(recent) - len(prior)
     trend = "up" if delta > max(3, len(prior) * 0.15) else (
         "down" if delta < -max(3, len(prior) * 0.15) else "stable"
@@ -312,7 +312,7 @@ def unit_detail(session: Session, unit_id: str) -> UnitDetailOut | None:
         + min(max(growth_pct, 0), 120) * 0.25
         + (neg / max(len(recent), 1)) * 18
     )
-    score = max(0, min(100, int(round(raw))))
+    score = max(0, min(100, round(raw)))
 
     topic_counts: dict[str, int] = defaultdict(int)
     for _, t, _, _, _, _ in recent:
