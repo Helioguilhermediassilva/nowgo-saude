@@ -1,4 +1,5 @@
-import { Minus, TrendingDown, TrendingUp } from "lucide-react";
+import Link from "next/link";
+import { ChevronRight, Minus, TrendingDown, TrendingUp } from "lucide-react";
 import type { RegionPressure } from "@/lib/types";
 
 function pressureBg(score: number) {
@@ -29,29 +30,32 @@ export function HeatmapRegions({ items }: { items: RegionPressure[] }) {
         {sorted.map((r) => {
           const Trend = TREND_ICON[r.trend];
           return (
-            <li
-              key={r.raId}
-              className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-md px-1 py-1 hover:bg-muted/40"
-            >
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center justify-between gap-2 text-xs">
-                  <span className="font-medium">{r.raName}</span>
-                  <span className="text-muted-foreground">
-                    {r.eventCount.toLocaleString("pt-BR")} eventos · {r.topTopic}
-                  </span>
+            <li key={r.raId}>
+              <Link
+                href={`/ra/${encodeURIComponent(r.raId)}`}
+                className="grid grid-cols-[1fr_auto_auto] items-center gap-3 rounded-md px-1 py-1 hover:bg-muted/40"
+              >
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between gap-2 text-xs">
+                    <span className="font-medium">{r.raName}</span>
+                    <span className="text-muted-foreground">
+                      {r.eventCount.toLocaleString("pt-BR")} eventos · {r.topTopic}
+                    </span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className={`h-full ${pressureBg(r.pressureScore)}`}
+                      style={{ width: `${r.pressureScore}%` }}
+                      aria-label={`Score ${r.pressureScore}`}
+                    />
+                  </div>
                 </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className={`h-full ${pressureBg(r.pressureScore)}`}
-                    style={{ width: `${r.pressureScore}%` }}
-                    aria-label={`Score ${r.pressureScore}`}
-                  />
-                </div>
-              </div>
-              <span className="flex items-center gap-1 text-xs tabular-nums text-muted-foreground">
-                <Trend className="size-3" />
-                {r.pressureScore}
-              </span>
+                <span className="flex items-center gap-1 text-xs tabular-nums text-muted-foreground">
+                  <Trend className="size-3" />
+                  {r.pressureScore}
+                </span>
+                <ChevronRight className="size-4 text-muted-foreground" />
+              </Link>
             </li>
           );
         })}

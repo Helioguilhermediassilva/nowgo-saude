@@ -6,7 +6,25 @@
 
 import "server-only";
 
-import type { MetricsSummary, PipelineHealthBackend } from "./types";
+import type {
+  AlertEvent,
+  AlertEventPage,
+  AlertFilters,
+  AttentionUnit,
+  KPI,
+  MetricsSummary,
+  PipelineHealth,
+  PipelineHealthBackend,
+  RegionDetail,
+  RegionPressure,
+  TimeSeriesPoint,
+  TopicSlice,
+  UnitDetail,
+} from "./types";
+
+interface ItemsEnvelope<T> {
+  items: T[];
+}
 
 type FetchOpts = {
   path: string;
@@ -49,6 +67,104 @@ export async function getBackendHealth(): Promise<PipelineHealthBackend | null> 
 
 export async function getBackendMetrics(): Promise<MetricsSummary | null> {
   return backendFetch<MetricsSummary>({ path: "/api/v1/metrics", auth: true, revalidate: 30 });
+}
+
+// Feature 002 — Command Center Dashboard aggregations.
+// All endpoints require the admin bearer; payloads use camelCase keys
+// matching the frontend types in `./types`.
+
+export async function getBackendDashboardHealth(): Promise<PipelineHealth | null> {
+  return backendFetch<PipelineHealth>({
+    path: "/api/v1/dashboard/health",
+    auth: true,
+    revalidate: 15,
+  });
+}
+
+export async function getBackendDashboardKpis(): Promise<KPI[] | null> {
+  const env = await backendFetch<ItemsEnvelope<KPI>>({
+    path: "/api/v1/dashboard/kpis",
+    auth: true,
+    revalidate: 30,
+  });
+  return env?.items ?? null;
+}
+
+export async function getBackendDashboardHeatmap(): Promise<RegionPressure[] | null> {
+  const env = await backendFetch<ItemsEnvelope<RegionPressure>>({
+    path: "/api/v1/dashboard/heatmap",
+    auth: true,
+    revalidate: 30,
+  });
+  return env?.items ?? null;
+}
+
+export async function getBackendDashboardRegion(raId: string): Promise<RegionDetail | null> {
+  return backendFetch<RegionDetail>({
+    path: `/api/v1/dashboard/regions/${encodeURIComponent(raId)}`,
+    auth: true,
+    revalidate: 30,
+  });
+}
+
+export async function getBackendDashboardAttention(limit = 12): Promise<AttentionUnit[] | null> {
+  const env = await backendFetch<ItemsEnvelope<AttentionUnit>>({
+    path: `/api/v1/dashboard/units/attention?limit=${limit}`,
+    auth: true,
+    revalidate: 30,
+  });
+  return env?.items ?? null;
+}
+
+export async function getBackendDashboardUnit(unitId: string): Promise<UnitDetail | null> {
+  return backendFetch<UnitDetail>({
+    path: `/api/v1/dashboard/units/${encodeURIComponent(unitId)}`,
+    auth: true,
+    revalidate: 30,
+  });
+}
+
+export async function getBackendDashboardTopics(): Promise<TopicSlice[] | null> {
+  const env = await backendFetch<ItemsEnvelope<TopicSlice>>({
+    path: "/api/v1/dashboard/topics",
+    auth: true,
+    revalidate: 60,
+  });
+  return env?.items ?? null;
+}
+
+export async function getBackendDashboardTimeseries(hours = 24): Promise<TimeSeriesPoint[] | null> {
+  const env = await backendFetch<ItemsEnvelope<TimeSeriesPoint>>({
+    path: `/api/v1/dashboard/timeseries?hours=${hours}`,
+    auth: true,
+    revalidate: 30,
+  });
+  return env?.items ?? null;
+}
+
+export async function getBackendDashboardAlerts(limit = 12): Promise<AlertEvent[] | null> {
+  const page = await getBackendDashboardAlertsPage({ limit });
+  return page?.items ?? null;
+}
+
+// Feature 002 §G2.4 — paginated + filterable alert listing for the
+// dedicated /alerts page. Multi-valued filters (severity/status) are
+// emitted as repeated query params, matching FastAPI's `list[str]` parsing.
+export async function getBackendDashboardAlertsPage(
+  filters: AlertFilters = {},
+): Promise<AlertEventPage | null> {
+  const params = new URLSearchParams();
+  params.set("limit", String(filters.limit ?? 12));
+  params.set("offset", String(filters.offset ?? 0));
+  for (const s of filters.severity ?? []) params.append("severity", s);
+  for (const s of filters.status ?? []) params.append("status", s);
+  if (filters.raId) params.set("raId", filters.raId);
+  if (filters.topic) params.set("topic", filters.topic);
+  return backendFetch<AlertEventPage>({
+    path: `/api/v1/dashboard/alerts?${params.toString()}`,
+    auth: true,
+    revalidate: 15,
+  });
 }
 
 export function isBackendConfigured(): boolean {

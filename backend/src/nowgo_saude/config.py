@@ -31,6 +31,15 @@ class Settings(BaseSettings):
     )
     pii_vault_key_version: int = Field(default=1, ge=1)
     classifier_low_confidence_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
+    health_latency_threshold_seconds: float = Field(
+        default=300.0,
+        ge=1.0,
+        description=(
+            "Maximum age (seconds) of the most recent classified event before"
+            " /api/v1/dashboard/health flips to 'degraded'. Raise this while"
+            " demoing static seed data ahead of live adapters (Phase H)."
+        ),
+    )
 
 
 @lru_cache(maxsize=1)

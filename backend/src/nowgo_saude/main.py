@@ -8,6 +8,7 @@ from fastapi import FastAPI
 
 from .api import events, metrics, pii, pipeline_runs, sources
 from .config import get_settings
+from .dashboard.api.router import router as dashboard_router
 from .db import init_db
 
 
@@ -37,6 +38,7 @@ def create_app() -> FastAPI:
     app.include_router(events.router)
     app.include_router(metrics.router)
     app.include_router(pii.router)
+    app.include_router(dashboard_router)
     return app
 
 

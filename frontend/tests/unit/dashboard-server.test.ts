@@ -28,6 +28,11 @@ describe("dashboard-server.getPipelineHealth", () => {
     const updatedAt = new Date().toISOString();
     const fetchMock = vi.fn(async (url: string | URL) => {
       const u = typeof url === "string" ? url : url.toString();
+      // Feature 002 dashboard health endpoint — return 404 so the bridge
+      // falls back to the legacy /health + /metrics flow exercised here.
+      if (u.endsWith("/api/v1/dashboard/health")) {
+        return new Response("not found", { status: 404 });
+      }
       if (u.endsWith("/health")) {
         return new Response(JSON.stringify({ status: "ok", environment: "prod" }), { status: 200 });
       }
@@ -50,7 +55,8 @@ describe("dashboard-server.getPipelineHealth", () => {
     const { getPipelineHealth } = await import("@/lib/dashboard-server");
     const health = await getPipelineHealth();
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // 3 calls: dashboard/health (miss) → health (hit) → metrics (hit).
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(health.status).toBe("ok");
     expect(health.latencyP95Seconds).toBe(80);
     expect(health.lastSuccessfulIngestionAt).toBe(updatedAt);
@@ -62,6 +68,9 @@ describe("dashboard-server.getPipelineHealth", () => {
 
     const fetchMock = vi.fn(async (url: string | URL) => {
       const u = typeof url === "string" ? url : url.toString();
+      if (u.endsWith("/api/v1/dashboard/health")) {
+        return new Response("not found", { status: 404 });
+      }
       if (u.endsWith("/health")) {
         return new Response(JSON.stringify({ status: "ok", environment: "prod" }), { status: 200 });
       }
@@ -82,6 +91,36 @@ describe("dashboard-server.getPipelineHealth", () => {
     const health = await getPipelineHealth();
     expect(health.status).toBe("degraded");
     expect(health.message).toContain("threshold");
+  });
+
+  it("prefers the dashboard/health endpoint when available", async () => {
+    process.env.BACKEND_API_URL = "https://backend.example.test";
+    process.env.BACKEND_API_TOKEN = "t-secret";
+
+    const updatedAt = new Date().toISOString();
+    const fetchMock = vi.fn(async (url: string | URL) => {
+      const u = typeof url === "string" ? url : url.toString();
+      if (u.endsWith("/api/v1/dashboard/health")) {
+        return new Response(
+          JSON.stringify({
+            status: "ok",
+            latencyP95Seconds: 42,
+            thresholdSeconds: 300,
+            lastSuccessfulIngestionAt: updatedAt,
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response("unexpected", { status: 500 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { getPipelineHealth } = await import("@/lib/dashboard-server");
+    const health = await getPipelineHealth();
+    // Single call — dashboard/health short-circuits the legacy fallback.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(health.latencyP95Seconds).toBe(42);
+    expect(health.thresholdSeconds).toBe(300);
   });
 
   it("falls back to mock when /health request fails", async () => {

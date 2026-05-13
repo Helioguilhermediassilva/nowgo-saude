@@ -58,6 +58,8 @@ export interface TopicSlice {
   pct: number;
 }
 
+export type AlertStatus = "open" | "acknowledged" | "resolved";
+
 export interface AlertEvent {
   id: string;
   ruleName: string;
@@ -65,7 +67,34 @@ export interface AlertEvent {
   triggeredAt: string;
   scope: string; // e.g. "RA Ceilândia"
   message: string;
-  status: "open" | "acknowledged" | "resolved";
+  status: AlertStatus;
+  raId?: string | null;
+  topic?: OperationalTopic | null;
+}
+
+export interface AlertSeverityCounts {
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+}
+
+// Server-side filterable + paginated alert listing (Feature 002 §G2.4).
+export interface AlertEventPage {
+  items: AlertEvent[];
+  total: number;
+  limit: number;
+  offset: number;
+  severityCounts: AlertSeverityCounts;
+}
+
+export interface AlertFilters {
+  severity?: Severity[];
+  status?: AlertStatus[];
+  raId?: string;
+  topic?: OperationalTopic;
+  limit?: number;
+  offset?: number;
 }
 
 export interface PipelineHealth {
@@ -74,6 +103,52 @@ export interface PipelineHealth {
   thresholdSeconds: number;
   lastSuccessfulIngestionAt: string;
   message?: string;
+}
+
+// Region drill-down (Feature 002 §G2.2): joins heatmap, topic mix,
+// hourly series, and the attention units inside a single RA.
+export interface RegionDetail {
+  raId: string;
+  raName: string;
+  population: number;
+  pressureScore: number;
+  eventCount24h: number;
+  eventCountPrev24h: number;
+  topTopic: OperationalTopic;
+  trend: "up" | "down" | "stable";
+  topics: TopicSlice[];
+  timeseries: TimeSeriesPoint[];
+  units: AttentionUnit[];
+}
+
+// Anonymized event row exposed in the unit drill-down feed.
+export interface RecentEvent {
+  id: string;
+  receivedAt: string; // ISO 8601
+  topic: OperationalTopic;
+  severity: number; // 0..3
+  sentiment: number; // -2..2
+  text: string;
+}
+
+// Unit drill-down (Feature 002 §G2.3): profile + 24h/prev/7d KPIs,
+// 7-day daily timeseries, topic mix, and recent anonymized events.
+export interface UnitDetail {
+  unitId: string;
+  name: string;
+  raId: string;
+  raName: string;
+  attentionScore: number;
+  severity: Severity;
+  eventCount24h: number;
+  eventCountPrev24h: number;
+  eventCount7d: number;
+  growthPct: number;
+  topTopic: OperationalTopic;
+  trend: "up" | "down" | "stable";
+  topics: TopicSlice[];
+  timeseries: TimeSeriesPoint[];
+  recentEvents: RecentEvent[];
 }
 
 // Raw shapes returned by the FastAPI backend (Feature 001).

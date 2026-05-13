@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import type { AttentionUnit, Severity } from "@/lib/types";
 
@@ -33,23 +34,25 @@ export function AttentionList({ items }: { items: AttentionUnit[] }) {
       </header>
       <ul className="flex flex-col divide-y divide-border">
         {sorted.map((u) => (
-          <li
-            key={u.unitId}
-            className="grid grid-cols-[auto_1fr_auto] items-center gap-3 py-2.5"
-          >
-            <span
-              className={`grid size-9 place-items-center rounded-md border text-sm font-semibold tabular-nums ${SEVERITY_STYLES[u.severity]}`}
-              title={`Severidade ${SEVERITY_LABEL[u.severity]}`}
+          <li key={u.unitId}>
+            <Link
+              href={`/units/${encodeURIComponent(u.unitId)}`}
+              className="grid grid-cols-[auto_1fr_auto] items-center gap-3 py-2.5 hover:bg-muted/40"
             >
-              {u.attentionScore}
-            </span>
-            <div className="flex min-w-0 flex-col">
-              <span className="truncate text-sm font-medium">{u.name}</span>
-              <span className="truncate text-[11px] text-muted-foreground">
-                {u.raName} · +{u.growthPct}% · {u.eventCount24h} eventos · {u.reason}
+              <span
+                className={`grid size-9 place-items-center rounded-md border text-sm font-semibold tabular-nums ${SEVERITY_STYLES[u.severity]}`}
+                title={`Severidade ${SEVERITY_LABEL[u.severity]}`}
+              >
+                {u.attentionScore}
               </span>
-            </div>
-            <ChevronRight className="size-4 text-muted-foreground" />
+              <div className="flex min-w-0 flex-col">
+                <span className="truncate text-sm font-medium">{u.name}</span>
+                <span className="truncate text-[11px] text-muted-foreground">
+                  {u.raName} · +{u.growthPct}% · {u.eventCount24h} eventos · {u.reason}
+                </span>
+              </div>
+              <ChevronRight className="size-4 text-muted-foreground" />
+            </Link>
           </li>
         ))}
       </ul>

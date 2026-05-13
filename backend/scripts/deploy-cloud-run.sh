@@ -67,7 +67,7 @@ gcloud run deploy "${SERVICE}" \
   --port=8000 \
   --allow-unauthenticated \
   --add-cloudsql-instances="${SQL_INSTANCE}" \
-  --set-env-vars=NOWGO_ENVIRONMENT=production \
+  --set-env-vars=NOWGO_ENVIRONMENT=production,NOWGO_HEALTH_LATENCY_THRESHOLD_SECONDS=86400 \
   --set-secrets=NOWGO_DATABASE_URL=NOWGO_DATABASE_URL:latest,NOWGO_ADMIN_TOKEN=NOWGO_ADMIN_TOKEN:latest,NOWGO_LGPD_OFFICER_TOKEN=NOWGO_LGPD_OFFICER_TOKEN:latest,NOWGO_PII_TOKEN_SECRET=NOWGO_PII_TOKEN_SECRET:latest,NOWGO_PII_VAULT_KEY=NOWGO_PII_VAULT_KEY:latest,NOWGO_PII_VAULT_KEY_VERSION=NOWGO_PII_VAULT_KEY_VERSION:latest \
   --min-instances=0 --max-instances=4 \
   --memory=512Mi --cpu=1 --timeout=60 \

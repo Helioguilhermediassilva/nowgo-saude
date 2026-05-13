@@ -3,12 +3,18 @@
 
 import type {
   AlertEvent,
+  AlertEventPage,
+  AlertFilters,
+  AlertSeverityCounts,
   AttentionUnit,
   KPI,
   PipelineHealth,
+  RecentEvent,
+  RegionDetail,
   RegionPressure,
   TimeSeriesPoint,
   TopicSlice,
+  UnitDetail,
 } from "./types";
 
 const RAS = [
@@ -177,6 +183,8 @@ export function getAlerts(): AlertEvent[] {
       scope: "RA Ceilândia",
       message: "Reclamações de fila acima do limiar de 30/h por 2 janelas seguidas",
       status: "open",
+      raId: "RA-IX",
+      topic: "fila",
     },
     {
       id: "a-002",
@@ -186,6 +194,8 @@ export function getAlerts(): AlertEvent[] {
       scope: "UBS 3 Sol Nascente",
       message: "Crescimento atípico (+58%) em queixas sobre medicamento em falta",
       status: "open",
+      raId: "RA-XXIX",
+      topic: "medicamento",
     },
     {
       id: "a-003",
@@ -195,8 +205,35 @@ export function getAlerts(): AlertEvent[] {
       scope: "RA Samambaia",
       message: "Score de pressão acima de 70 por 3 janelas consecutivas",
       status: "acknowledged",
+      raId: "RA-XII",
+      topic: "atendimento",
     },
   ];
+}
+
+// Feature 002 §G2.4 — paginable mock list used as fallback when the
+// backend is unreachable. Mirrors the server contract (items + total +
+// severity counts) so the UI can be exercised end-to-end offline.
+export function getAlertsPage(filters: AlertFilters = {}): AlertEventPage {
+  const base = getAlerts();
+  const filtered = base.filter((a) => {
+    if (filters.severity?.length && !filters.severity.includes(a.severity)) return false;
+    if (filters.status?.length && !filters.status.includes(a.status)) return false;
+    if (filters.raId && a.raId !== filters.raId) return false;
+    if (filters.topic && a.topic !== filters.topic) return false;
+    return true;
+  });
+  const limit = filters.limit ?? 12;
+  const offset = filters.offset ?? 0;
+  const counts: AlertSeverityCounts = { critical: 0, high: 0, medium: 0, low: 0 };
+  for (const a of filtered) counts[a.severity] += 1;
+  return {
+    items: filtered.slice(offset, offset + limit),
+    total: filtered.length,
+    limit,
+    offset,
+    severityCounts: counts,
+  };
 }
 
 export function getPipelineHealth(): PipelineHealth {
@@ -205,5 +242,101 @@ export function getPipelineHealth(): PipelineHealth {
     latencyP95Seconds: 47,
     thresholdSeconds: 300,
     lastSuccessfulIngestionAt: new Date(Date.now() - 12_000).toISOString(),
+  };
+}
+
+// Derived unit drill-down used as fallback when the backend cannot be
+// reached. Picks the attention-unit row matching `unitId` and synthesizes
+// a 7-day daily series plus a small feed of anonymized events.
+const MOCK_RECENT_PHRASES: Record<string, string> = {
+  fila: "Fila longa para atendimento, sem informação sobre tempo de espera.",
+  atendimento: "Atendimento demorado, equipe parecia sobrecarregada.",
+  medicamento: "Medicamento em falta na unidade, precisei buscar em outra.",
+  agendamento: "Não conseguiu agendar consulta, sistema indisponível.",
+  infraestrutura: "Ar-condicionado não funciona, banheiro com problema.",
+  outros: "Comentário sobre o serviço prestado na unidade.",
+};
+
+export function getUnitDetail(unitId: string): UnitDetail | null {
+  const unit = getAttentionUnits().find((u) => u.unitId === unitId);
+  if (!unit) return null;
+  const ra = RAS.find((r) => r.name === unit.raName);
+  const allTopics = getTopics();
+  const total24h = unit.eventCount24h;
+  const topics: TopicSlice[] = allTopics.map((t) => {
+    const count = Math.max(1, Math.round((t.pct / 100) * total24h));
+    return { topic: t.topic, count, pct: t.pct };
+  });
+  // Daily 7d series anchored at midnight UTC.
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  const timeseries: TimeSeriesPoint[] = [];
+  let total7d = 0;
+  for (let i = 6; i >= 0; i--) {
+    const value = Math.max(1, Math.round(total24h * (0.6 + rng() * 0.8)));
+    total7d += value;
+    timeseries.push({
+      ts: new Date(today.getTime() - i * 86_400_000).toISOString(),
+      value,
+    });
+  }
+  const recentEvents: RecentEvent[] = Array.from({ length: 6 }).map((_, idx) => {
+    const topic = (allTopics[idx % allTopics.length]?.topic ?? "outros") as TopicSlice["topic"];
+    return {
+      id: `mock-${unitId}-${idx}`,
+      receivedAt: new Date(Date.now() - (idx + 1) * 15 * 60_000).toISOString(),
+      topic,
+      severity: 1 + Math.floor(rng() * 3),
+      sentiment: -1 - Math.floor(rng() * 2),
+      text: MOCK_RECENT_PHRASES[topic] ?? MOCK_RECENT_PHRASES.outros,
+    } as RecentEvent;
+  });
+  const prev24h = Math.max(1, Math.round(total24h / (1 + unit.growthPct / 100)));
+  return {
+    unitId: unit.unitId,
+    name: unit.name,
+    raId: ra?.id ?? "",
+    raName: unit.raName,
+    attentionScore: unit.attentionScore,
+    severity: unit.severity,
+    eventCount24h: total24h,
+    eventCountPrev24h: prev24h,
+    eventCount7d: total7d,
+    growthPct: unit.growthPct,
+    topTopic: topics[0]?.topic ?? "outros",
+    trend: unit.growthPct > 10 ? "up" : unit.growthPct < -10 ? "down" : "stable",
+    topics,
+    timeseries,
+    recentEvents,
+  };
+}
+
+// Derived region drill-down used as fallback when the backend cannot be
+// reached. Picks the heatmap row matching `raId` and seeds the drill-down
+// from the existing topics/timeseries/attention mocks.
+export function getRegionDetail(raId: string): RegionDetail | null {
+  const ra = RAS.find((r) => r.id === raId);
+  if (!ra) return null;
+  const pressure = getHeatmap().find((r) => r.raId === raId);
+  const allTopics = getTopics();
+  const total24h = Math.round(60 + rng() * 240);
+  // Scale the global topic mix to the RA scope.
+  const topics: TopicSlice[] = allTopics.map((t) => {
+    const count = Math.max(1, Math.round((t.pct / 100) * total24h));
+    return { topic: t.topic, count, pct: t.pct };
+  });
+  const units = getAttentionUnits().filter((u) => u.raName === ra.name);
+  return {
+    raId: ra.id,
+    raName: ra.name,
+    population: 100_000 + Math.round(rng() * 400_000),
+    pressureScore: pressure?.pressureScore ?? Math.round(20 + rng() * 75),
+    eventCount24h: total24h,
+    eventCountPrev24h: Math.round(total24h * (0.6 + rng() * 0.6)),
+    topTopic: pressure?.topTopic ?? "fila",
+    trend: pressure?.trend ?? "stable",
+    topics,
+    timeseries: getTimeSeries(24),
+    units,
   };
 }
