@@ -32,6 +32,14 @@ class Settings(BaseSettings):
     pii_vault_key_version: int = Field(default=1, ge=1)
     classifier_low_confidence_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
 
+    otel_enabled: bool = Field(
+        default=False,
+        description=(
+            "Master switch for OpenTelemetry tracing. Off by default so unit "
+            "tests do not need an OTLP collector; production sets it via env."
+        ),
+    )
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
