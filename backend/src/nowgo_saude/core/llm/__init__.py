@@ -7,6 +7,7 @@ and Principle II (LGPD by design) are enforced at the boundary, not at the
 caller.
 """
 
+from .grok_provider import GrokProvider
 from .null_provider import NullProvider
 from .provider import (
     LLMProvider,
@@ -15,6 +16,7 @@ from .provider import (
 )
 
 __all__ = [
+    "GrokProvider",
     "LLMProvider",
     "LLMResponse",
     "LLMUnavailableError",
