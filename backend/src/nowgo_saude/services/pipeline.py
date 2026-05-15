@@ -10,6 +10,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
+from opentelemetry import trace
 from sqlalchemy.orm import Session
 
 from ..config import get_settings
@@ -20,6 +21,8 @@ from ..schemas import EventIngestRequest
 from . import audit as audit_service
 from . import pii_vault as pii_vault_service
 from .anonymization import AnonymizationResult, anonymize, contains_residual_pii
+
+_tracer = trace.get_tracer(__name__)
 
 
 class IngestionError(Exception):
@@ -55,62 +58,75 @@ def ingest_event(
     actor_id: str = "system",
     pipeline_run: PipelineRun | None = None,
 ) -> TelemetryEvent:
-    source = (
-        session.query(Source)
-        .filter(Source.slug == payload.source_slug, Source.enabled.is_(True))
-        .one_or_none()
-    )
-    if source is None:
-        raise IngestionError(f"unknown or disabled source: {payload.source_slug}")
+    with _tracer.start_as_current_span("pipeline.ingest_event") as span:
+        span.set_attribute("nowgo.source.slug", payload.source_slug)
+        span.set_attribute("nowgo.event.topic", payload.topic)
 
-    result = anonymize(payload.text)
-    severity, attributes = _apply_low_confidence_rule(
-        payload.severity, payload.confidence, payload.attributes
-    )
+        source = (
+            session.query(Source)
+            .filter(Source.slug == payload.source_slug, Source.enabled.is_(True))
+            .one_or_none()
+        )
+        if source is None:
+            span.set_attribute("nowgo.event.status", "rejected")
+            raise IngestionError(f"unknown or disabled source: {payload.source_slug}")
 
-    status = "classified"
-    if result.failed or contains_residual_pii(result.text_anonymized):
-        status = "quarantined"
-    else:
-        _persist_findings(session, result)
+        result = anonymize(payload.text)
+        severity, attributes = _apply_low_confidence_rule(
+            payload.severity, payload.confidence, payload.attributes
+        )
 
-    event = TelemetryEvent(
-        source_id=source.id,
-        external_id=payload.external_id,
-        received_at=datetime.now(UTC),
-        occurred_at=payload.occurred_at,
-        region_code=payload.region_code,
-        unit_code=payload.unit_code,
-        topic=payload.topic,
-        subtopic=payload.subtopic,
-        sentiment=payload.sentiment,
-        severity=severity,
-        confidence=payload.confidence,
-        text_anonymized=result.text_anonymized,
-        pii_tokens=result.pii_tokens,
-        attributes=attributes,
-        iso_37120=payload.iso_37120,
-        iso_37122=payload.iso_37122,
-        status=status,
-    )
-    session.add(event)
-    session.flush()
+        status = "classified"
+        if result.failed or contains_residual_pii(result.text_anonymized):
+            status = "quarantined"
+        else:
+            _persist_findings(session, result)
 
-    if pipeline_run is not None:
-        pipeline_run.events_collected += 1
-        if status == "quarantined":
-            pipeline_run.events_quarantined += 1
+        event = TelemetryEvent(
+            source_id=source.id,
+            external_id=payload.external_id,
+            received_at=datetime.now(UTC),
+            occurred_at=payload.occurred_at,
+            region_code=payload.region_code,
+            unit_code=payload.unit_code,
+            topic=payload.topic,
+            subtopic=payload.subtopic,
+            sentiment=payload.sentiment,
+            severity=severity,
+            confidence=payload.confidence,
+            text_anonymized=result.text_anonymized,
+            pii_tokens=result.pii_tokens,
+            attributes=attributes,
+            iso_37120=payload.iso_37120,
+            iso_37122=payload.iso_37122,
+            status=status,
+        )
+        session.add(event)
+        session.flush()
 
-    audit_service.record(
-        session,
-        actor_id=actor_id,
-        action="event.classify",
-        target_kind="event",
-        target_id=event.id,
-        payload={"source_slug": payload.source_slug, "topic": payload.topic, "status": status},
-        metadata={"severity": severity, "confidence": payload.confidence},
-    )
-    return event
+        if pipeline_run is not None:
+            pipeline_run.events_collected += 1
+            if status == "quarantined":
+                pipeline_run.events_quarantined += 1
+
+        audit_service.record(
+            session,
+            actor_id=actor_id,
+            action="event.classify",
+            target_kind="event",
+            target_id=event.id,
+            payload={
+                "source_slug": payload.source_slug,
+                "topic": payload.topic,
+                "status": status,
+            },
+            metadata={"severity": severity, "confidence": payload.confidence},
+        )
+
+        span.set_attribute("nowgo.event.status", status)
+        span.set_attribute("nowgo.event.severity", severity)
+        span.set_attribute("nowgo.anonymization.failed", result.failed)
+        return event
 
 
 def reprocess_events(

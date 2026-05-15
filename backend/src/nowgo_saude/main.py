@@ -8,13 +8,19 @@ from fastapi import FastAPI
 
 from .api import events, metrics, pii, pipeline_runs, sources
 from .config import get_settings
+from .core.observability import setup_tracing, shutdown_tracing
 from .db import init_db
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
     init_db()
-    yield
+    settings = get_settings()
+    setup_tracing(app, enabled=settings.otel_enabled)
+    try:
+        yield
+    finally:
+        shutdown_tracing()
 
 
 def create_app() -> FastAPI:
