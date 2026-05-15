@@ -7,6 +7,7 @@ should override DATABASE_URL with a PostgreSQL DSN (per the data-model spec).
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -31,6 +32,17 @@ class Settings(BaseSettings):
     )
     pii_vault_key_version: int = Field(default=1, ge=1)
     classifier_low_confidence_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
+
+    # --- Auth (T028) ---------------------------------------------------------
+    # ``static`` keeps the bearer-token contract used by CI and the OpenAPI
+    # smoke suite. ``jwt`` enables full signature/exp/iss/aud validation via
+    # :class:`nowgo_saude.core.auth.JwtAuthProvider`. T041 will layer rate
+    # limiting and audit hooks on top of whichever backend is active.
+    auth_backend: Literal["static", "jwt"] = Field(default="static")
+    jwt_secret: str = Field(default="dev-jwt-secret-change-me")
+    jwt_algorithm: str = Field(default="HS256")
+    jwt_issuer: str = Field(default="nowgo-saude")
+    jwt_audience: str = Field(default="nowgo-saude-backend")
 
 
 @lru_cache(maxsize=1)

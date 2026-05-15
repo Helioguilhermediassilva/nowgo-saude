@@ -65,15 +65,18 @@ def test_reidentify_requires_lgpd_token(client: TestClient) -> None:
     event = _ingest_with_pii(client)
     token = event["pii_tokens"][0]
 
-    # Admin token must NOT be accepted on the PII endpoint
+    # Admin token authenticates but lacks the ``lgpd_officer`` role → 403.
+    # (Pre-T028 this returned 401 because auth was a single-token equality
+    # check; under the AuthProvider model we distinguish "unknown caller" from
+    # "known caller, insufficient role".)
     r = client.post(
         f"/api/v1/pii/{token}",
         json={"reason": "test"},
         headers=ADMIN_HEADERS,
     )
-    assert r.status_code == 401
+    assert r.status_code == 403
 
-    # No auth at all
+    # No auth at all → 401.
     r = client.post(f"/api/v1/pii/{token}", json={"reason": "test"})
     assert r.status_code == 401
 
