@@ -8,6 +8,7 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from nowgo_saude import models  # noqa: F401  (import side-effect: register models)
+from nowgo_saude.ai import models as _ai_models  # noqa: F401  (PRD 003 tables)
 from nowgo_saude.config import get_settings
 from nowgo_saude.db import Base, normalize_db_url
 

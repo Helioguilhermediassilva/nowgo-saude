@@ -46,6 +46,7 @@ def init_db() -> None:
     """Create all tables. Used by tests and the dev bootstrap."""
     # Import to register models on the metadata before create_all.
     from . import models  # noqa: F401
+    from .ai import models as _ai_models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
 
