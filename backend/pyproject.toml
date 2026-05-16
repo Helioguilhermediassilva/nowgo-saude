@@ -29,6 +29,7 @@ ignore = ["S101"]
 "tests/**/*.py" = ["S101", "S106", "S608"]
 "src/nowgo_saude/api/**/*.py" = ["B008"]
 "alembic/versions/*.py" = ["E501", "I001", "F401", "UP"]
+"src/nowgo_saude/ai/guards/*.py" = ["E501"]
 
 [tool.mypy]
 python_version = "3.11"
